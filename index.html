@@ -33,10 +33,10 @@
         }
     </script>
     <style>
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        * { -webkit-tap-highlight-color: transparent; user-select: none; }
-        input { user-select: text; }
+        /* Smooth transitions without 360 wrap flips */
+        .forecast-arrow {
+            transition: transform 0.15s ease-out;
+        }
     </style>
 </head>
 <body class="h-full font-sans antialiased text-slate-100 bg-slate-950 sm:py-6 flex justify-center items-center overflow-hidden">
@@ -282,7 +282,9 @@
         };
 
         let deviceHeading = 0; // Phone compass bearing in degrees
-        let forecastWindDirs = [0, 0, 0, 0]; // Forecast directions
+        let forecastWindDirs = [0, 0, 0, 0]; // Raw forecast directions
+        let forecastAccumulatedRotations = [0, 0, 0, 0]; // Unwrapped accumulated angles to prevent 360 spin
+        let forecastPrevTargets = [0, 0, 0, 0];
 
         let stationData = {
             temp: null,
@@ -347,7 +349,7 @@
             }
         }
 
-        // Canvas Rendering (Direct trigonometry, zero CSS transition jumps/spins)
+        // Canvas Rendering (Bold typography & zero-spin vector canvas)
         function drawCompassCanvas() {
             const canvas = document.getElementById('compass-canvas');
             if (!canvas) {
@@ -359,7 +361,7 @@
             const h = canvas.height;
             const cx = w / 2;
             const cy = h / 2;
-            const radius = w / 2 - 12;
+            const radius = w / 2 - 14;
 
             ctx.clearRect(0, 0, w, h);
 
@@ -371,38 +373,54 @@
             // Outer Circle
             ctx.beginPath();
             ctx.arc(0, 0, radius, 0, Math.PI * 2);
-            ctx.strokeStyle = '#334155';
-            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 5;
             ctx.stroke();
 
-            // Inner Dashed Ring
+            // Inner Ring
             ctx.beginPath();
-            ctx.arc(0, 0, radius - 12, 0, Math.PI * 2);
-            ctx.strokeStyle = '#1e293b';
+            ctx.arc(0, 0, radius - 16, 0, Math.PI * 2);
+            ctx.strokeStyle = '#334155';
             ctx.lineWidth = 2;
-            ctx.setLineDash([4, 4]);
+            ctx.setLineDash([6, 6]);
             ctx.stroke();
             ctx.setLineDash([]);
 
-            // Cardinal Markers
+            // Cardinal Markers (Large Bold Font)
             const labels = [
-                { text: 'N', angle: 0, color: '#f87171' },
-                { text: 'E', angle: 90, color: '#94a3b8' },
-                { text: 'S', angle: 180, color: '#94a3b8' },
-                { text: 'W', angle: 270, color: '#94a3b8' }
+                { text: 'N', angle: 0, color: '#ef4444', size: 'bold 24px sans-serif' },
+                { text: 'E', angle: 90, color: '#cbd5e1', size: 'bold 20px sans-serif' },
+                { text: 'S', angle: 180, color: '#cbd5e1', size: 'bold 20px sans-serif' },
+                { text: 'W', angle: 270, color: '#cbd5e1', size: 'bold 20px sans-serif' }
             ];
 
-            ctx.font = 'bold 16px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-
             labels.forEach(item => {
+                ctx.font = item.size;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
                 const rad = (item.angle * Math.PI) / 180;
-                const tx = (radius - 22) * Math.sin(rad);
-                const ty = -(radius - 22) * Math.cos(rad);
+                const tx = (radius - 28) * Math.sin(rad);
+                const ty = -(radius - 28) * Math.cos(rad);
                 ctx.fillStyle = item.color;
                 ctx.fillText(item.text, tx, ty);
             });
+
+            // Intermediate Ticks
+            for (let a = 0; a < 360; a += 30) {
+                if (a % 90 !== 0) {
+                    const rad = (a * Math.PI) / 180;
+                    const x1 = (radius - 8) * Math.sin(rad);
+                    const y1 = -(radius - 8) * Math.cos(rad);
+                    const x2 = (radius - 1) * Math.sin(rad);
+                    const y2 = -(radius - 1) * Math.cos(rad);
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                    ctx.strokeStyle = '#64748b';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+            }
 
             ctx.restore();
 
@@ -412,22 +430,24 @@
             ctx.translate(cx, cy);
             ctx.rotate((netWindAngle * Math.PI) / 180);
 
-            // Arrow Head pointing in wind direction
+            // Large Arrow Head
             ctx.beginPath();
             ctx.moveTo(0, -(radius - 12));
-            ctx.lineTo(-10, -(radius - 28));
-            ctx.lineTo(10, -(radius - 28));
+            ctx.lineTo(-14, -(radius - 34));
+            ctx.lineTo(14, -(radius - 34));
             ctx.closePath();
-            ctx.fillStyle = '#22d3ee';
-            ctx.shadowColor = 'rgba(34,211,238,0.8)';
-            ctx.shadowBlur = 10;
+            ctx.fillStyle = '#38bdf8';
+            ctx.shadowColor = 'rgba(56,189,248,0.9)';
+            ctx.shadowBlur = 12;
             ctx.fill();
 
-            // Tail
+            // Arrow Stem
             ctx.beginPath();
-            ctx.arc(0, 0, 5, 0, Math.PI * 2);
-            ctx.fillStyle = '#22d3ee';
-            ctx.fill();
+            ctx.moveTo(0, -(radius - 34));
+            ctx.lineTo(0, -(radius - 50));
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 4;
+            ctx.stroke();
 
             ctx.restore();
 
@@ -435,11 +455,12 @@
             ctx.save();
             ctx.translate(cx, cy);
             ctx.beginPath();
-            ctx.arc(0, 0, 34, 0, Math.PI * 2);
+            ctx.arc(0, 0, 42, 0, Math.PI * 2);
             ctx.fillStyle = '#0f172a';
-            ctx.strokeStyle = '#334155';
-            ctx.lineWidth = 2;
-            ctx.shadowColor = 'transparent';
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 3;
+            ctx.shadowColor = 'rgba(0,0,0,0.5)';
+            ctx.shadowBlur = 8;
             ctx.fill();
             ctx.stroke();
 
@@ -448,28 +469,39 @@
             if (config.speedUnit === 'kmh') speedDisplay *= 1.60934;
 
             ctx.fillStyle = '#ffffff';
-            ctx.font = 'black 22px sans-serif';
+            ctx.font = '900 28px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(speedDisplay.toFixed(1), 0, -4);
+            ctx.fillText(speedDisplay.toFixed(1), 0, -5);
 
             // Speed Unit
             ctx.fillStyle = '#94a3b8';
-            ctx.font = 'bold 10px sans-serif';
-            ctx.fillText(config.speedUnit.toUpperCase(), 0, 14);
+            ctx.font = 'bold 12px sans-serif';
+            ctx.fillText(config.speedUnit.toUpperCase(), 0, 18);
 
             ctx.restore();
 
             requestAnimationFrame(drawCompassCanvas);
         }
 
-        // Dynamic 4-Hour Forecast Arrow Rotation based on Live Compass Heading
+        // Shortest path unwrapping for forecast arrows to stop 360 spin
         function updateForecastArrowOrientations() {
             for (let i = 1; i <= 4; i++) {
                 const arrowEl = document.getElementById(`forecast-arrow-${i}`);
                 if (arrowEl) {
-                    const relativeDir = forecastWindDirs[i - 1] - deviceHeading;
-                    arrowEl.style.transform = `rotate(${relativeDir}deg)`;
+                    const targetAngle = forecastWindDirs[i - 1] - deviceHeading;
+                    let prevTarget = forecastPrevTargets[i - 1];
+                    let accum = forecastAccumulatedRotations[i - 1];
+
+                    let diff = (targetAngle - prevTarget) % 360;
+                    if (diff < -180) diff += 360;
+                    if (diff > 180) diff -= 360;
+
+                    accum += diff;
+                    forecastAccumulatedRotations[i - 1] = accum;
+                    forecastPrevTargets[i - 1] = targetAngle;
+
+                    arrowEl.style.transform = `rotate(${accum}deg)`;
                 }
             }
         }
@@ -697,20 +729,20 @@
                 const hourTemp = config.tempUnit === 'C' ? (hourTempF - 32) * 5 / 9 : hourTempF;
                 
                 const hourDir = (stationData.windDir + i * 15) % 360;
-                forecastWindDirs[i - 1] = hourDir; // Save for real-time compass rotation
+                forecastWindDirs[i - 1] = hourDir;
 
                 let hourSpeed = (stationData.windSpeed || 5) + (i % 2 === 0 ? 1.2 : -0.8);
                 if (config.speedUnit === 'kmh') hourSpeed *= 1.60934;
 
-                const relativeDir = hourDir - deviceHeading;
+                const initialAngle = hourDir - deviceHeading;
 
                 html += `
                     <div class="bg-slate-900/80 border border-slate-700/50 rounded-2xl p-2.5 flex flex-col items-center justify-between space-y-2">
                         <span class="text-[10px] font-bold text-slate-400 uppercase">${formattedHour}</span>
                         <div class="text-sm font-black text-white">${hourTemp.toFixed(0)}°</div>
                         
-                        <div id="forecast-arrow-${i}" class="my-1 text-ambient-accent transition-transform duration-75" style="transform: rotate(${relativeDir}deg)">
-                            <i data-lucide="arrow-up" class="w-3.5 h-3.5"></i>
+                        <div id="forecast-arrow-${i}" class="forecast-arrow my-1 text-ambient-accent" style="transform: rotate(${initialAngle}deg)">
+                            <i data-lucide="arrow-up" class="w-4 h-4"></i>
                         </div>
 
                         <div class="text-[10px] font-bold text-cyan-300 flex items-center">
@@ -721,6 +753,13 @@
             }
             container.innerHTML = html;
             lucide.createIcons();
+            
+            // Reset trackers
+            for (let i = 0; i < 4; i++) {
+                const targetAngle = forecastWindDirs[i] - deviceHeading;
+                forecastAccumulatedRotations[i] = targetAngle;
+                forecastPrevTargets[i] = targetAngle;
+            }
             updateForecastArrowOrientations();
         }
 
