@@ -371,6 +371,40 @@
             lastUpdated: new Date()
         };
 
+        // Simulated Weather Telemetry Generator
+        function simulateLiveSample() {
+            const now = new Date();
+            const baseTemp = 72 + Math.sin(now.getMinutes() / 10) * 4;
+            const windSpeed = Math.max(1.2, 8.5 + Math.sin(now.getSeconds() / 5) * 6);
+            const windDir = (210 + Math.floor(Math.sin(now.getSeconds() / 10) * 45)) % 360;
+
+            stationData = {
+                temp: baseTemp,
+                feelsLike: baseTemp + 1.5,
+                tempMax: baseTemp + 6,
+                tempMin: baseTemp - 5,
+                windDir: windDir,
+                windSpeed: windSpeed,
+                windGust: windSpeed + 4.8,
+                humidity: 58,
+                baro: 29.92,
+                uv: 4,
+                solar: 420,
+                rain: 0.05,
+                mac: "SIM-00:11:22:33",
+                name: "Demo Home Station",
+                lastUpdated: now
+            };
+
+            // Generate synthetic 4-hour forecast trends
+            forecastWindDirs = [
+                (windDir + 10) % 360,
+                (windDir + 25) % 360,
+                (windDir + 40) % 360,
+                (windDir + 15) % 360
+            ];
+        }
+
         // Real-Time Phone Compass Orientation Listener
         function initCompassSensor() {
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -610,6 +644,18 @@
             lucide.createIcons();
         }
 
+        function updateBadge(isDemo = false, customText = "") {
+            const badge = document.getElementById('connection-badge');
+            if (!badge) return;
+            if (isDemo) {
+                badge.textContent = customText || "DEMO MODE";
+                badge.className = "px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30";
+            } else {
+                badge.textContent = "LIVE API";
+                badge.className = "px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+            }
+        }
+
         // Robust Fetch Wrapper supporting Fallback CORS Proxies
         async function fetchWithProxyFallback(targetUrl) {
             const proxies = [
@@ -760,8 +806,8 @@
                 gustDisplay *= 1.60934;
             }
 
-            document.getElementById('wind-speed-alt').textContent = speedDisplay.toFixed(1);
-            document.getElementById('wind-gust').textContent = gustDisplay.toFixed(1);
+            document.getElementById('wind-speed-alt').textContent = speedDisplay !== null ? speedDisplay.toFixed(1) : '0.0';
+            document.getElementById('wind-gust').textContent = gustDisplay !== null ? gustDisplay.toFixed(1) : '0.0';
 
             const cardinal = getCardinalDirection(stationData.windDir);
             document.getElementById('wind-dir-text').textContent = `${cardinal} (${stationData.windDir}°)`;
@@ -769,7 +815,7 @@
             document.getElementById('metric-humidity').textContent = stationData.humidity !== null ? `${stationData.humidity}%` : '--%';
             document.getElementById('metric-baro').textContent = stationData.baro !== null ? `${stationData.baro} inHg` : '-- inHg';
             document.getElementById('metric-uv').textContent = stationData.uv !== null ? `${stationData.uv} UV` : '-- UV';
-            document.getElementById('metric-solar').textContent = stationData.solar !== null ? `${stationData.solar} W/m²` : 'Solar Radiation N/A';
+            document.getElementById('metric-solar').textContent = stationData.solar !== null ? `${stationData.solar} W/m²` : 'Solar N/A';
             document.getElementById('metric-rain').textContent = stationData.rain !== null ? `${stationData.rain} in` : '-- in';
 
             document.getElementById('station-name').textContent = stationData.name;
@@ -782,15 +828,45 @@
             updateMapWindOverlay();
         }
 
+        // Render 4-Hour Hourly Forecast Vector Grid
+        function renderForecast() {
+            const container = document.getElementById('forecast-hourly-container');
+            if (!container) return;
+
+            const now = new Date();
+            let html = '';
+
+            for (let i = 1; i <= 4; i++) {
+                const hourTime = new Date(now.getTime() + i * 3600000);
+                const timeStr = hourTime.toLocaleTimeString([], { hour: 'numeric' });
+                const dir = forecastWindDirs[i - 1] || 0;
+                const cardinal = getCardinalDirection(dir);
+
+                html += `
+                    <div class="p-2.5 bg-slate-900/60 rounded-2xl border border-slate-700/40 text-center flex flex-col items-center justify-between">
+                        <span class="text-[10px] font-semibold text-slate-400 uppercase">${timeStr}</span>
+                        <div class="my-2 p-2 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-center">
+                            <i id="forecast-arrow-${i}" data-lucide="navigation" class="forecast-arrow w-4 h-4 text-ambient-accent" style="transform: rotate(${dir}deg);"></i>
+                        </div>
+                        <span class="text-[10px] font-bold text-slate-200">${cardinal}</span>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = html;
+            lucide.createIcons();
+            updateForecastArrowOrientations();
+        }
+
         // Map View & GPS Telemetry Initialization
         function initMapView() {
             if (leafletMap) return; // Prevent duplicate instantiation
 
             const cartoApiKey = "cb1_4vd4_1_377c11fd11f29e9c8f3bfaf4";
             
-            // Dark Matter Tile Layer with Carto API Key for authorized access
+            // Dark raster tile URL authenticated using your CARTO API Key
             leafletMap = L.map('wind-map', { zoomControl: false }).setView([userLat, userLng], 12);
-            L.tileLayer(`https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?api_key=${cartoApiKey}`, {
+            L.tileLayer(`https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key=${cartoApiKey}`, {
                 maxZoom: 19,
                 subdomains: 'abcd',
                 attribution: '&copy; OpenStreetMap &copy; CARTO'
