@@ -8,6 +8,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Leaflet CSS & JS for Interactive Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -222,6 +225,44 @@
                 </div>
             </section>
 
+            <!-- MAP VIEW TAB -->
+            <section id="tab-map" class="tab-content hidden h-full flex flex-col space-y-3">
+                <div class="flex justify-between items-center px-1">
+                    <div>
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                            <i data-lucide="map-pin" class="w-4 h-4 text-ambient-accent"></i> Location & Wind Field
+                        </h2>
+                        <p id="geo-status-text" class="text-[11px] text-slate-400">Acquiring GPS position...</p>
+                    </div>
+                    <button onclick="centerMapOnUser()" class="px-3 py-1.5 rounded-xl bg-ambient-500/20 text-ambient-accent border border-ambient-500/30 font-bold text-xs flex items-center gap-1 hover:bg-ambient-500/30 transition-all">
+                        <i data-lucide="crosshair" class="w-3.5 h-3.5"></i> Locate Me
+                    </button>
+                </div>
+
+                <!-- Interactive Map Container -->
+                <div class="relative flex-1 min-h-[360px] rounded-3xl overflow-hidden border border-slate-700/60 shadow-xl bg-slate-900">
+                    <div id="wind-map" class="w-full h-full z-10"></div>
+
+                    <!-- Overlay Wind Telemetry Card -->
+                    <div class="absolute bottom-3 left-3 right-3 z-20 p-3 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-2xl flex items-center justify-between shadow-lg">
+                        <div class="flex items-center space-x-3">
+                            <div id="map-wind-indicator" class="p-2.5 rounded-xl bg-ambient-500/20 border border-ambient-500/30 text-ambient-accent transition-transform duration-300">
+                                <i data-lucide="navigation" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <div class="text-xs font-bold text-white" id="map-wind-speed">0.0 mph</div>
+                                <div class="text-[10px] text-slate-400" id="map-wind-dir">Direction: 0° (N)</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span id="map-intensity-badge" class="px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                                LIGHT BREEZE
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- API & SETTINGS TAB -->
             <section id="tab-settings" class="tab-content hidden space-y-4">
                 <!-- Display Units -->
@@ -252,6 +293,10 @@
             <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn active flex flex-col items-center py-1 px-4 rounded-xl text-ambient-accent transition-all">
                 <i data-lucide="gauge" class="w-5 h-5"></i>
                 <span class="text-[10px] font-semibold mt-1">Live Gauge</span>
+            </button>
+            <button onclick="switchTab('map')" id="nav-map" class="nav-btn flex flex-col items-center py-1 px-4 rounded-xl text-slate-400 hover:text-slate-200 transition-all">
+                <i data-lucide="map" class="w-5 h-5"></i>
+                <span class="text-[10px] font-semibold mt-1">Map View</span>
             </button>
             <button onclick="switchTab('settings')" id="nav-settings" class="nav-btn flex flex-col items-center py-1 px-4 rounded-xl text-slate-400 hover:text-slate-200 transition-all">
                 <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
@@ -285,6 +330,13 @@
         let forecastWindDirs = [0, 0, 0, 0]; // Raw forecast directions
         let forecastAccumulatedRotations = [0, 0, 0, 0]; // Unwrapped accumulated angles to prevent 360 spin
         let forecastPrevTargets = [0, 0, 0, 0];
+
+        // Map State Variables
+        let leafletMap = null;
+        let userMarker = null;
+        let windOverlayLayer = null;
+        let userLat = 41.15; // Default lat fallback
+        let userLng = -74.19; // Default lng fallback
 
         let stationData = {
             temp: null,
@@ -714,53 +766,132 @@
             `;
 
             renderForecast();
+            updateMapWindOverlay();
         }
 
-        function renderForecast() {
-            const container = document.getElementById('forecast-hourly-container');
-            const nowHour = new Date().getHours();
-            
-            let html = '';
-            for (let i = 1; i <= 4; i++) {
-                const hourTime = (nowHour + i) % 24;
-                const formattedHour = hourTime === 0 ? '12 AM' : hourTime > 12 ? `${hourTime - 12} PM` : `${hourTime} AM`;
-                
-                const hourTempF = (stationData.temp || 70) + (i % 2 === 0 ? 1 : -1) * i;
-                const hourTemp = config.tempUnit === 'C' ? (hourTempF - 32) * 5 / 9 : hourTempF;
-                
-                const hourDir = (stationData.windDir + i * 15) % 360;
-                forecastWindDirs[i - 1] = hourDir;
+        // Map View & GPS Telemetry Initialization
+        function initMapView() {
+            if (leafletMap) return; // Prevent duplicate instantiation
 
-                let hourSpeed = (stationData.windSpeed || 5) + (i % 2 === 0 ? 1.2 : -0.8);
-                if (config.speedUnit === 'kmh') hourSpeed *= 1.60934;
+            // Dark Matter Tile Layer for sleek ambient theme
+            leafletMap = L.map('wind-map', { zoomControl: false }).setView([userLat, userLng], 12);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                maxZoom: 19,
+                subdomains: 'abcd',
+                attribution: '&copy; OpenStreetMap'
+            }).addTo(leafletMap);
 
-                const initialAngle = hourDir - deviceHeading;
+            windOverlayLayer = L.layerGroup().addTo(leafletMap);
 
-                html += `
-                    <div class="bg-slate-900/80 border border-slate-700/50 rounded-2xl p-2.5 flex flex-col items-center justify-between space-y-2">
-                        <span class="text-[10px] font-bold text-slate-400 uppercase">${formattedHour}</span>
-                        <div class="text-sm font-black text-white">${hourTemp.toFixed(0)}°</div>
+            centerMapOnUser();
+        }
+
+        function centerMapOnUser() {
+            const statusEl = document.getElementById('geo-status-text');
+            if ("geolocation" in navigator) {
+                if (statusEl) statusEl.textContent = "Acquiring GPS fix...";
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        userLat = pos.coords.latitude;
+                        userLng = pos.coords.longitude;
+                        if (statusEl) statusEl.textContent = `GPS Fix: ${userLat.toFixed(3)}°, ${userLng.toFixed(3)}°`;
                         
-                        <div id="forecast-arrow-${i}" class="forecast-arrow my-1 text-ambient-accent" style="transform: rotate(${initialAngle}deg)">
-                            <i data-lucide="arrow-up" class="w-4 h-4"></i>
-                        </div>
+                        if (leafletMap) {
+                            leafletMap.setView([userLat, userLng], 13);
+                            updateMapMarkers();
+                        }
+                    },
+                    (err) => {
+                        if (statusEl) statusEl.textContent = "GPS Unavailable (Using Default Region)";
+                        if (leafletMap) {
+                            leafletMap.setView([userLat, userLng], 12);
+                            updateMapMarkers();
+                        }
+                    },
+                    { timeout: 10000, enableHighAccuracy: true }
+                );
+            } else {
+                if (statusEl) statusEl.textContent = "Geolocation unsupported by device.";
+            }
+        }
 
-                        <div class="text-[10px] font-bold text-cyan-300 flex items-center">
-                            ${hourSpeed.toFixed(0)} <span class="text-[8px] ml-0.5 text-slate-400">${config.speedUnit}</span>
-                        </div>
-                    </div>
-                `;
+        function updateMapMarkers() {
+            if (!leafletMap) return;
+
+            // Remove existing location marker if any
+            if (userMarker) leafletMap.removeLayer(userMarker);
+
+            // Pulse User Marker HTML
+            const userIcon = L.divIcon({
+                className: 'custom-user-marker',
+                html: `<div class="relative flex items-center justify-center w-8 h-8">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-4 w-4 bg-sky-500 border-2 border-white shadow-lg"></span>
+                       </div>`,
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+            });
+
+            userMarker = L.marker([userLat, userLng], { icon: userIcon }).addTo(leafletMap);
+            updateMapWindOverlay();
+        }
+
+        function updateMapWindOverlay() {
+            if (!leafletMap || !windOverlayLayer) return;
+
+            windOverlayLayer.clearLayers();
+
+            const speed = stationData.windSpeed || 0;
+            const dir = stationData.windDir || 0;
+            let speedDisplay = speed;
+            if (config.speedUnit === 'kmh') speedDisplay *= 1.60934;
+
+            // Intensity rating calculation
+            let intensityText = "LIGHT BREEZE";
+            let colorClass = "cyan";
+            if (speed > 20) {
+                intensityText = "HIGH WINDS";
+                colorClass = "rose";
+            } else if (speed > 10) {
+                intensityText = "MODERATE WIND";
+                colorClass = "amber";
             }
-            container.innerHTML = html;
-            lucide.createIcons();
-            
-            // Reset trackers
-            for (let i = 0; i < 4; i++) {
-                const targetAngle = forecastWindDirs[i] - deviceHeading;
-                forecastAccumulatedRotations[i] = targetAngle;
-                forecastPrevTargets[i] = targetAngle;
+
+            // Update Map Card Telemetry UI
+            const speedCard = document.getElementById('map-wind-speed');
+            const dirCard = document.getElementById('map-wind-dir');
+            const indicatorCard = document.getElementById('map-wind-indicator');
+            const badgeCard = document.getElementById('map-intensity-badge');
+
+            if (speedCard) speedCard.textContent = `${speedDisplay.toFixed(1)} ${config.speedUnit}`;
+            if (dirCard) dirCard.textContent = `Direction: ${dir}° (${getCardinalDirection(dir)})`;
+            if (indicatorCard) indicatorCard.style.transform = `rotate(${dir}deg)`;
+
+            if (badgeCard) {
+                badgeCard.textContent = intensityText;
+                badgeCard.className = `px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-${colorClass}-500/20 text-${colorClass}-300 border border-${colorClass}-500/30`;
             }
-            updateForecastArrowOrientations();
+
+            // Create Wind Field Vector Arrow Mesh Over the Map
+            const gridOffsets = [
+                [0, 0], [0.015, 0.015], [-0.015, -0.015], [0.015, -0.015], [-0.015, 0.015],
+                [0.03, 0], [-0.03, 0], [0, 0.03], [0, -0.03]
+            ];
+
+            gridOffsets.forEach(([dLat, dLng]) => {
+                const arrowIcon = L.divIcon({
+                    className: 'wind-arrow-marker',
+                    html: `<div style="transform: rotate(${dir}deg); transition: transform 0.3s ease-out;" class="text-sky-400 opacity-80 filter drop-shadow-md">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="12" y1="19" x2="12" y2="5"></line>
+                                <polyline points="5 12 12 5 19 12"></polyline>
+                            </svg>
+                           </div>`,
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                });
+                L.marker([userLat + dLat, userLng + dLng], { icon: arrowIcon }).addTo(windOverlayLayer);
+            });
         }
 
         function switchTab(tabId) {
@@ -772,6 +903,13 @@
                 btn.classList.add('text-slate-400');
             });
             document.getElementById(`nav-${tabId}`).classList.add('text-ambient-accent');
+
+            if (tabId === 'map') {
+                setTimeout(() => {
+                    initMapView();
+                    if (leafletMap) leafletMap.invalidateSize();
+                }, 100);
+            }
         }
 
         function setTempUnit(unit) {
