@@ -265,6 +265,21 @@
 
             <!-- API & SETTINGS TAB -->
             <section id="tab-settings" class="tab-content hidden space-y-4">
+                <!-- Station Simulation & Demo Toggle -->
+                <div class="rounded-3xl bg-slate-800/80 border border-slate-700/60 p-5 shadow-xl space-y-4">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">Data Source Mode</h3>
+                    
+                    <div class="flex items-center justify-between py-2 border-b border-slate-700/50">
+                        <div>
+                            <span class="text-xs text-slate-300 font-medium block">Demo Mode Simulation</span>
+                            <span class="text-[10px] text-slate-400">Force realistic simulated station data</span>
+                        </div>
+                        <button id="toggle-demo-btn" onclick="toggleDemoMode()" class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none bg-slate-700">
+                            <span id="toggle-demo-dot" class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out translate-x-0"></span>
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Display Units -->
                 <div class="rounded-3xl bg-slate-800/80 border border-slate-700/60 p-5 shadow-xl space-y-4">
                     <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">Preferences</h3>
@@ -321,7 +336,7 @@
         let config = {
             appKey: localStorage.getItem('ambient_app_key') || HARDCODED_APP_KEY,
             userKey: localStorage.getItem('ambient_user_key') || HARDCODED_DEVICE_KEY,
-            useDemo: false,
+            useDemo: localStorage.getItem('ambient_use_demo') === 'true',
             tempUnit: localStorage.getItem('ambient_temp_unit') || 'F',
             speedUnit: localStorage.getItem('ambient_speed_unit') || 'mph'
         };
@@ -639,7 +654,11 @@
             const appKey = config.appKey.trim();
             const apiKey = config.userKey.trim();
 
-            if (appKey && apiKey) {
+            if (config.useDemo) {
+                updateBadge(true, "DEMO MODE");
+                setStatusBanner('warning', 'Demo Mode Active', 'Using simulated station telemetry.', 'DEMO');
+                simulateLiveSample();
+            } else if (appKey && apiKey) {
                 try {
                     setStatusBanner('info', 'Connecting to Station', 'Querying api.ambientweather.net/v1/devices...', 'FETCHING');
                     
@@ -690,35 +709,29 @@
             if (refreshIcon) setTimeout(() => refreshIcon.classList.remove('animate-spin'), 600);
         }
 
-        function simulateLiveSample() {
-            const variation = (Math.random() - 0.5) * 1.5;
-            stationData = {
-                temp: parseFloat((72.4 + variation).toFixed(1)),
-                feelsLike: parseFloat((71.0 + variation).toFixed(1)),
-                tempMax: 76.2,
-                tempMin: 62.1,
-                windDir: Math.floor((330 + (Math.random() - 0.5) * 20) % 360),
-                windSpeed: parseFloat((8.5 + (Math.random() - 0.5) * 2).toFixed(1)),
-                windGust: parseFloat((14.2 + (Math.random() - 0.5) * 3).toFixed(1)),
-                humidity: 58,
-                baro: 29.92,
-                uv: 5,
-                solar: 450,
-                rain: 0.00,
-                mac: "00:0E:C6:XX:XX:XX",
-                name: "Home Weather Station",
-                lastUpdated: new Date()
-            };
+        function toggleDemoMode() {
+            config.useDemo = !config.useDemo;
+            localStorage.setItem('ambient_use_demo', config.useDemo);
+            updateDemoToggleUI();
+            showToast(config.useDemo ? "Demo mode enabled" : "Live API mode enabled");
+            fetchWeatherData();
         }
 
-        function updateBadge(isDemo, customText = null) {
-            const badge = document.getElementById('connection-badge');
-            if (isDemo) {
-                badge.textContent = customText || "DEMO MODE";
-                badge.className = "px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30";
-            } else {
-                badge.textContent = "STATION ONLINE";
-                badge.className = "px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+        function updateDemoToggleUI() {
+            const btn = document.getElementById('toggle-demo-btn');
+            const dot = document.getElementById('toggle-demo-dot');
+            if (btn && dot) {
+                if (config.useDemo) {
+                    btn.classList.remove('bg-slate-700');
+                    btn.classList.add('bg-ambient-500');
+                    dot.classList.remove('translate-x-0');
+                    dot.classList.add('translate-x-5');
+                } else {
+                    btn.classList.remove('bg-ambient-500');
+                    btn.classList.add('bg-slate-700');
+                    dot.classList.remove('translate-x-5');
+                    dot.classList.add('translate-x-0');
+                }
             }
         }
 
@@ -949,6 +962,7 @@
         window.onload = function() {
             setTempUnit(config.tempUnit);
             setSpeedUnit(config.speedUnit);
+            updateDemoToggleUI();
 
             initCompassSensor();
 
