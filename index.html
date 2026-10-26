@@ -11,8 +11,6 @@
     <!-- Leaflet CSS & JS for Interactive Map -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- Leaflet Rotate Plugin for smooth map bearing rotation -->
-    <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -45,10 +43,6 @@
             width: 100%;
             height: 100%;
             background-color: #0f172a;
-        }
-        /* Custom map container transitions for rotation smoothness */
-        .leaflet-container {
-            transition: transform 0.1s linear;
         }
     </style>
 </head>
@@ -190,49 +184,6 @@
                         <!-- Loaded by JS -->
                     </div>
                 </div>
-
-                <!-- Extended Station Metrics Grid -->
-                <div class="rounded-3xl bg-slate-800/80 border border-slate-700/60 p-4 shadow-xl space-y-3">
-                    <div class="flex justify-between items-center px-1">
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">Station Telemetry</h3>
-                        <i data-lucide="sliders" class="w-3.5 h-3.5 text-slate-400"></i>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-2.5">
-                        <div class="p-3 bg-slate-900/60 rounded-2xl border border-slate-700/40">
-                            <div class="flex items-center space-x-2 text-slate-400 mb-1">
-                                <i data-lucide="droplets" class="w-3.5 h-3.5 text-blue-400"></i>
-                                <span class="text-[10px] font-medium uppercase">Humidity</span>
-                            </div>
-                            <span id="metric-humidity" class="text-lg font-bold text-white">--%</span>
-                        </div>
-
-                        <div class="p-3 bg-slate-900/60 rounded-2xl border border-slate-700/40">
-                            <div class="flex items-center space-x-2 text-slate-400 mb-1">
-                                <i data-lucide="gauge" class="w-3.5 h-3.5 text-purple-400"></i>
-                                <span class="text-[10px] font-medium uppercase">Pressure</span>
-                            </div>
-                            <span id="metric-baro" class="text-lg font-bold text-white">-- inHg</span>
-                        </div>
-
-                        <div class="p-3 bg-slate-900/60 rounded-2xl border border-slate-700/40">
-                            <div class="flex items-center space-x-2 text-slate-400 mb-1">
-                                <i data-lucide="sun" class="w-3.5 h-3.5 text-amber-400"></i>
-                                <span class="text-[10px] font-medium uppercase">Solar / UV</span>
-                            </div>
-                            <span id="metric-uv" class="text-lg font-bold text-white">-- UV</span>
-                            <span id="metric-solar" class="block text-[10px] text-slate-400">-- W/m²</span>
-                        </div>
-
-                        <div class="p-3 bg-slate-900/60 rounded-2xl border border-slate-700/40">
-                            <div class="flex items-center space-x-2 text-slate-400 mb-1">
-                                <i data-lucide="cloud-rain" class="w-3.5 h-3.5 text-cyan-400"></i>
-                                <span class="text-[10px] font-medium uppercase">Daily Rain</span>
-                            </div>
-                            <span id="metric-rain" class="text-lg font-bold text-white">-- in</span>
-                        </div>
-                    </div>
-                </div>
             </section>
 
             <!-- MAP VIEW TAB -->
@@ -240,43 +191,63 @@
                 <div class="flex justify-between items-center px-1">
                     <div>
                         <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                            <i data-lucide="map-pin" class="w-4 h-4 text-ambient-accent"></i> Location & Wind Field
+                            <i data-lucide="map-pin" class="w-4 h-4 text-ambient-accent"></i> Location & Satellite Wind Field
                         </h2>
                         <p id="geo-status-text" class="text-[11px] text-slate-400">Acquiring GPS position...</p>
                     </div>
 
-                    <!-- Map Orientation Controls -->
-                    <div class="flex items-center space-x-1.5">
-                        <button id="btn-map-orientation" onclick="toggleMapOrientationMode()" class="px-2.5 py-1.5 rounded-xl bg-slate-800 text-slate-300 border border-slate-700/80 font-bold text-[11px] flex items-center gap-1 hover:bg-slate-700 transition-all">
-                            <i id="map-orient-icon" data-lucide="compass" class="w-3.5 h-3.5 text-ambient-accent"></i>
-                            <span id="map-orient-text">North Up</span>
-                        </button>
-                        <button onclick="centerMapOnUser()" class="p-1.5 rounded-xl bg-ambient-500/20 text-ambient-accent border border-ambient-500/30 font-bold hover:bg-ambient-500/30 transition-all" title="Locate Me">
-                            <i data-lucide="crosshair" class="w-4 h-4"></i>
-                        </button>
-                    </div>
+                    <!-- Map Location Control -->
+                    <button onclick="centerMapOnUser()" class="p-2 rounded-xl bg-ambient-500/20 text-ambient-accent border border-ambient-500/30 font-bold hover:bg-ambient-500/30 transition-all flex items-center gap-1 text-xs" title="Locate Me">
+                        <i data-lucide="crosshair" class="w-4 h-4"></i> Center GPS
+                    </button>
                 </div>
 
-                <!-- Interactive Map Container -->
+                <!-- Interactive Satellite Map Container -->
                 <div class="relative flex-1 min-h-[360px] rounded-3xl overflow-hidden border border-slate-700/60 shadow-xl bg-slate-900">
                     <div id="wind-map" class="w-full h-full z-10"></div>
+                </div>
 
-                    <!-- Overlay Wind Telemetry Card -->
-                    <div class="absolute bottom-3 left-3 right-3 z-20 p-3 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-2xl flex items-center justify-between shadow-lg">
-                        <div class="flex items-center space-x-3">
-                            <div id="map-wind-indicator" class="p-2.5 rounded-xl bg-ambient-500/20 border border-ambient-500/30 text-ambient-accent transition-transform duration-300">
-                                <i data-lucide="navigation" class="w-5 h-5"></i>
-                            </div>
-                            <div>
-                                <div class="text-xs font-bold text-white" id="map-wind-speed">0.0 mph</div>
-                                <div class="text-[10px] text-slate-400" id="map-wind-dir">Direction: 0° (N)</div>
-                            </div>
+                <!-- Telemetry Card Below Map -->
+                <div class="p-3.5 bg-slate-900/90 border border-slate-700/80 rounded-2xl flex items-center justify-between shadow-lg">
+                    <div class="flex items-center space-x-3">
+                        <div id="map-wind-indicator" class="p-2.5 rounded-xl bg-ambient-500/20 border border-ambient-500/30 text-ambient-accent transition-transform duration-300">
+                            <i data-lucide="navigation" class="w-5 h-5"></i>
                         </div>
-                        <div class="text-right">
-                            <span id="map-intensity-badge" class="px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                                LIGHT BREEZE
-                            </span>
+                        <div>
+                            <div class="text-xs font-bold text-white" id="map-wind-speed">0.0 mph</div>
+                            <div class="text-[10px] text-slate-400" id="map-wind-dir">Direction: 0° (N)</div>
                         </div>
+                    </div>
+                    <div class="text-right">
+                        <span id="map-intensity-badge" class="px-2.5 py-1 text-[10px] font-extrabold rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                            LIGHT BREEZE
+                        </span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ALL DATA VALUES TAB -->
+            <section id="tab-data" class="tab-content hidden space-y-4">
+                <div class="rounded-3xl bg-slate-800/80 border border-slate-700/60 p-4 shadow-xl space-y-3">
+                    <div class="flex justify-between items-center px-1">
+                        <div>
+                            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                                <i data-lucide="database" class="w-4 h-4 text-ambient-accent"></i> All Station Telemetry
+                            </h2>
+                            <p class="text-[11px] text-slate-400">Complete raw payload parameters from Ambient Weather</p>
+                        </div>
+                        <span id="raw-field-count" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-900 text-slate-400 font-mono border border-slate-700">0 Parameters</span>
+                    </div>
+
+                    <!-- Search Input -->
+                    <div class="relative">
+                        <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                        <input id="data-search-input" onkeyup="filterRawData()" type="text" placeholder="Search keys or values..." class="w-full bg-slate-900/80 text-xs text-slate-200 placeholder-slate-500 rounded-xl pl-9 pr-3 py-2 border border-slate-700 focus:outline-none focus:border-ambient-500">
+                    </div>
+
+                    <!-- Data Grid Container -->
+                    <div id="all-data-grid" class="space-y-2 max-h-[580px] overflow-y-auto pr-1">
+                        <!-- Dynamically populated by JS -->
                     </div>
                 </div>
             </section>
@@ -322,16 +293,20 @@
         </main>
 
         <!-- Navigation Tabs -->
-        <nav class="bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-6 py-2 flex justify-around items-center z-40">
-            <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn active flex flex-col items-center py-1 px-4 rounded-xl text-ambient-accent transition-all">
+        <nav class="bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-3 py-2 flex justify-around items-center z-40">
+            <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn active flex flex-col items-center py-1 px-3 rounded-xl text-ambient-accent transition-all">
                 <i data-lucide="gauge" class="w-5 h-5"></i>
                 <span class="text-[10px] font-semibold mt-1">Live Gauge</span>
             </button>
-            <button onclick="switchTab('map')" id="nav-map" class="nav-btn flex flex-col items-center py-1 px-4 rounded-xl text-slate-400 hover:text-slate-200 transition-all">
+            <button onclick="switchTab('map')" id="nav-map" class="nav-btn flex flex-col items-center py-1 px-3 rounded-xl text-slate-400 hover:text-slate-200 transition-all">
                 <i data-lucide="map" class="w-5 h-5"></i>
                 <span class="text-[10px] font-semibold mt-1">Map View</span>
             </button>
-            <button onclick="switchTab('settings')" id="nav-settings" class="nav-btn flex flex-col items-center py-1 px-4 rounded-xl text-slate-400 hover:text-slate-200 transition-all">
+            <button onclick="switchTab('data')" id="nav-data" class="nav-btn flex flex-col items-center py-1 px-3 rounded-xl text-slate-400 hover:text-slate-200 transition-all">
+                <i data-lucide="database" class="w-5 h-5"></i>
+                <span class="text-[10px] font-semibold mt-1">All Data</span>
+            </button>
+            <button onclick="switchTab('settings')" id="nav-settings" class="nav-btn flex flex-col items-center py-1 px-3 rounded-xl text-slate-400 hover:text-slate-200 transition-all">
                 <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
                 <span class="text-[10px] font-semibold mt-1">Settings</span>
             </button>
@@ -350,7 +325,6 @@
         // Key Constants
         const HARDCODED_APP_KEY = "f848e17eba814fc0b86853bba568cba4442f2d5bc846465bbb46bc64574cd8c6";
         const HARDCODED_DEVICE_KEY = "0fcadb9f148641c5a5b0f07e0d913e084c0606f6fc304877aeee4e3723aa2604";
-        const CARTO_API_KEY = "cb1_4vd4_1_377c11fd11f29e9c8f3bfaf4";
 
         let config = {
             appKey: HARDCODED_APP_KEY,
@@ -361,7 +335,6 @@
         };
 
         let deviceHeading = 0; // Phone compass bearing in degrees
-        let mapRotateMode = localStorage.getItem('ambient_map_rotate_mode') || 'north-up'; // 'north-up' or 'bearing-up'
         
         let forecastWindDirs = [220, 235, 250, 225];
         let forecastAccumulatedRotations = [0, 0, 0, 0];
@@ -373,6 +346,8 @@
         let windOverlayLayer = null;
         let userLat = 41.15; // Default lat fallback
         let userLng = -74.19; // Default lng fallback
+
+        let rawPayload = {}; // Raw key-value dictionary from API response
 
         let stationData = {
             temp: 72,
@@ -397,6 +372,35 @@
             const baseTemp = 72 + Math.sin(now.getMinutes() / 10) * 4;
             const windSpeed = Math.max(1.2, 8.5 + Math.sin(now.getSeconds() / 5) * 6);
             const windDir = (210 + Math.floor(Math.sin(now.getSeconds() / 10) * 45)) % 360;
+
+            rawPayload = {
+                "dateutc": now.getTime(),
+                "tempf": parseFloat(baseTemp.toFixed(1)),
+                "humidity": 58,
+                "windspeedmph": parseFloat(windSpeed.toFixed(1)),
+                "windgustmph": parseFloat((windSpeed + 4.8).toFixed(1)),
+                "maxdailygust": parseFloat((windSpeed + 8.2).toFixed(1)),
+                "winddir": windDir,
+                "winddir_avg10m": (windDir + 5) % 360,
+                "uv": 4,
+                "solarradiation": 420.5,
+                "hourlyrainin": 0.00,
+                "eventrainin": 0.05,
+                "dailyrainin": 0.05,
+                "weeklyrainin": 0.32,
+                "monthlyrainin": 1.45,
+                "totalrainin": 12.80,
+                "baromrelin": 29.92,
+                "baromabsin": 29.85,
+                "tempinf": 71.2,
+                "humidityin": 45,
+                "feelsLike": parseFloat((baseTemp + 1.5).toFixed(1)),
+                "dewPoint": 56.4,
+                "battout": 1,
+                "battin": 1,
+                "tz": "America/New_York",
+                "date": now.toISOString()
+            };
 
             stationData = {
                 temp: baseTemp,
@@ -464,7 +468,6 @@
             if (heading !== null && !isNaN(heading)) {
                 deviceHeading = heading;
                 updateForecastArrowOrientations();
-                updateMapBearing();
             }
         }
 
@@ -619,54 +622,6 @@
             }
         }
 
-        function toggleMapOrientationMode() {
-            if (mapRotateMode === 'north-up') {
-                mapRotateMode = 'bearing-up';
-                showToast("Map set to Dynamic Bearing");
-            } else {
-                mapRotateMode = 'north-up';
-                showToast("Map set to North Up");
-            }
-            localStorage.setItem('ambient_map_rotate_mode', mapRotateMode);
-            updateMapOrientationUI();
-            updateMapBearing();
-        }
-
-        function updateMapOrientationUI() {
-            const btnText = document.getElementById('map-orient-text');
-            const btnIcon = document.getElementById('map-orient-icon');
-            if (btnText && btnIcon) {
-                if (mapRotateMode === 'bearing-up') {
-                    btnText.textContent = "Bearing Up";
-                    btnIcon.setAttribute('data-lucide', 'navigation');
-                } else {
-                    btnText.textContent = "North Up";
-                    btnIcon.setAttribute('data-lucide', 'compass');
-                }
-                if (window.lucide) lucide.createIcons();
-            }
-        }
-
-        function updateMapBearing() {
-            if (!leafletMap) return;
-
-            if (mapRotateMode === 'bearing-up') {
-                if (typeof leafletMap.setBearing === 'function') {
-                    leafletMap.setBearing(-deviceHeading);
-                } else {
-                    const container = leafletMap.getContainer();
-                    if (container) container.style.transform = `rotate(${-deviceHeading}deg)`;
-                }
-            } else {
-                if (typeof leafletMap.setBearing === 'function') {
-                    leafletMap.setBearing(0);
-                } else {
-                    const container = leafletMap.getContainer();
-                    if (container) container.style.transform = 'rotate(0deg)';
-                }
-            }
-        }
-
         function updateClock() {
             const now = new Date();
             const h = String(now.getHours()).padStart(2, '0');
@@ -770,6 +725,7 @@
                     if (Array.isArray(devices) && devices.length > 0) {
                         const dev = devices[0];
                         const lastData = dev.lastData || {};
+                        rawPayload = lastData; // Save complete raw API dictionary
                         
                         stationData = {
                             temp: lastData.tempf ?? lastData.tempinf ?? 72,
@@ -803,6 +759,7 @@
             }
 
             renderDashboard();
+            renderAllDataTab();
             if (refreshIcon) setTimeout(() => refreshIcon.classList.remove('animate-spin'), 600);
         }
 
@@ -863,12 +820,6 @@
             const cardinal = getCardinalDirection(stationData.windDir);
             document.getElementById('wind-dir-text').textContent = `${cardinal} (${stationData.windDir}°)`;
 
-            document.getElementById('metric-humidity').textContent = stationData.humidity !== null ? `${stationData.humidity}%` : '--%';
-            document.getElementById('metric-baro').textContent = stationData.baro !== null ? `${stationData.baro} inHg` : '-- inHg';
-            document.getElementById('metric-uv').textContent = stationData.uv !== null ? `${stationData.uv} UV` : '-- UV';
-            document.getElementById('metric-solar').textContent = stationData.solar !== null ? `${stationData.solar} W/m²` : 'Solar N/A';
-            document.getElementById('metric-rain').textContent = stationData.rain !== null ? `${stationData.rain} in` : '-- in';
-
             document.getElementById('station-name').textContent = stationData.name;
             document.getElementById('last-updated').innerHTML = `
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -877,6 +828,95 @@
 
             renderForecast();
             updateMapWindOverlay();
+        }
+
+        function renderAllDataTab() {
+            const container = document.getElementById('all-data-grid');
+            const countBadge = document.getElementById('raw-field-count');
+            if (!container) return;
+
+            const entries = Object.entries(rawPayload || {});
+            if (countBadge) countBadge.textContent = `${entries.length} Parameters`;
+
+            if (entries.length === 0) {
+                container.innerHTML = `
+                    <div class="p-6 text-center text-slate-500 text-xs">
+                        No telemetry parameters recorded yet. Pull to refresh or toggle demo mode.
+                    </div>
+                `;
+                return;
+            }
+
+            // Key descriptions mapping for user friendly display
+            const descriptions = {
+                "tempf": "Outdoor Temperature (°F)",
+                "tempinf": "Indoor Temperature (°F)",
+                "humidity": "Outdoor Relative Humidity (%)",
+                "humidityin": "Indoor Relative Humidity (%)",
+                "windspeedmph": "Sustained Wind Speed (mph)",
+                "windgustmph": "Peak Wind Gust (mph)",
+                "maxdailygust": "Max Daily Wind Gust (mph)",
+                "winddir": "Wind Direction Angle (0-360°)",
+                "winddir_avg10m": "10-Minute Average Wind Angle",
+                "uv": "Ultra-Violet Index (0-16)",
+                "solarradiation": "Solar Irradiance (W/m²)",
+                "hourlyrainin": "Hourly Rain Accumulation (in)",
+                "eventrainin": "Event Rain Accumulation (in)",
+                "dailyrainin": "Daily Total Rainfall (in)",
+                "weeklyrainin": "Weekly Rain Accumulation (in)",
+                "monthlyrainin": "Monthly Rain Accumulation (in)",
+                "totalrainin": "Total Lifetime Rain (in)",
+                "baromrelin": "Relative Atmospheric Pressure (inHg)",
+                "baromabsin": "Absolute Atmospheric Pressure (inHg)",
+                "feelsLike": "Calculated Heat/Wind Chill Index (°F)",
+                "dewPoint": "Outdoor Dew Point (°F)",
+                "battout": "Outdoor Sensor Battery (1=OK, 0=Low)",
+                "battin": "Indoor Console Battery Status",
+                "date": "Station Report Timestamp (ISO)",
+                "dateutc": "Station Report Epoch Milliseconds",
+                "tz": "Station Timezone Location"
+            };
+
+            let html = '';
+
+            entries.sort(([a], [b]) => a.localeCompare(b)).forEach(([key, val]) => {
+                const label = descriptions[key] || key;
+                let valDisplay = val;
+                
+                if (typeof val === 'boolean') valDisplay = val ? 'True' : 'False';
+                else if (val === null || val === undefined) valDisplay = 'N/A';
+
+                html += `
+                    <div class="data-row-item p-3 bg-slate-900/70 rounded-2xl border border-slate-800 flex justify-between items-center transition-all hover:border-slate-700" data-key="${key.toLowerCase()}" data-label="${label.toLowerCase()}" data-val="${String(valDisplay).toLowerCase()}">
+                        <div class="space-y-0.5 pr-2">
+                            <span class="text-xs font-semibold text-slate-200 block">${label}</span>
+                            <span class="text-[10px] font-mono text-slate-500 uppercase block">${key}</span>
+                        </div>
+                        <div class="text-right flex-shrink-0">
+                            <span class="text-xs font-mono font-bold text-ambient-accent bg-slate-800/80 px-2.5 py-1 rounded-xl border border-slate-700/60 block">${valDisplay}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function filterRawData() {
+            const query = (document.getElementById('data-search-input')?.value || '').toLowerCase().trim();
+            const rows = document.querySelectorAll('.data-row-item');
+
+            rows.forEach(row => {
+                const k = row.getAttribute('data-key') || '';
+                const l = row.getAttribute('data-label') || '';
+                const v = row.getAttribute('data-val') || '';
+
+                if (!query || k.includes(query) || l.includes(query) || v.includes(query)) {
+                    row.classList.remove('hidden');
+                } else {
+                    row.classList.add('hidden');
+                }
+            });
         }
 
         function renderForecast() {
@@ -911,18 +951,17 @@
         function initMapView() {
             if (leafletMap) return;
 
-            const tileUrl = `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key=${CARTO_API_KEY}`;
+            // Standard High-Detail World Imagery Satellite Layer
+            const satelliteUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
             
-            leafletMap = L.map('wind-map', { zoomControl: false, rotate: true, touchRotate: true }).setView([userLat, userLng], 12);
-            L.tileLayer(tileUrl, {
-                maxZoom: 19,
-                subdomains: 'abcd',
-                attribution: '&copy; OpenStreetMap &copy; CARTO'
+            leafletMap = L.map('wind-map', { zoomControl: false }).setView([userLat, userLng], 14);
+            L.tileLayer(satelliteUrl, {
+                maxZoom: 18,
+                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
             }).addTo(leafletMap);
 
             windOverlayLayer = L.layerGroup().addTo(leafletMap);
             centerMapOnUser();
-            updateMapOrientationUI();
         }
 
         function centerMapOnUser() {
@@ -936,14 +975,14 @@
                         if (statusEl) statusEl.textContent = `GPS Fix: ${userLat.toFixed(3)}°, ${userLng.toFixed(3)}°`;
                         
                         if (leafletMap) {
-                            leafletMap.setView([userLat, userLng], 13);
+                            leafletMap.setView([userLat, userLng], 14);
                             updateMapMarkers();
                         }
                     },
                     (err) => {
                         if (statusEl) statusEl.textContent = "GPS Unavailable (Default Region)";
                         if (leafletMap) {
-                            leafletMap.setView([userLat, userLng], 12);
+                            leafletMap.setView([userLat, userLng], 13);
                             updateMapMarkers();
                         }
                     },
@@ -1004,25 +1043,25 @@
 
             if (badgeCard) {
                 badgeCard.textContent = intensityText;
-                badgeCard.className = `px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-${colorClass}-500/20 text-${colorClass}-300 border border-${colorClass}-500/30`;
+                badgeCard.className = `px-2.5 py-1 text-[10px] font-extrabold rounded-full bg-${colorClass}-500/20 text-${colorClass}-300 border border-${colorClass}-500/30`;
             }
 
             const gridOffsets = [
-                [0, 0], [0.015, 0.015], [-0.015, -0.015], [0.015, -0.015], [-0.015, 0.015],
-                [0.03, 0], [-0.03, 0], [0, 0.03], [0, -0.03]
+                [0, 0], [0.008, 0.008], [-0.008, -0.008], [0.008, -0.008], [-0.008, 0.008],
+                [0.016, 0], [-0.016, 0], [0, 0.016], [0, -0.016]
             ];
 
             gridOffsets.forEach(([dLat, dLng]) => {
                 const arrowIcon = L.divIcon({
                     className: 'wind-arrow-marker',
-                    html: `<div style="transform: rotate(${dir}deg);" class="text-sky-400 opacity-80 filter drop-shadow-md">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    html: `<div style="transform: rotate(${dir}deg);" class="text-sky-300 opacity-90 filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                                 <line x1="12" y1="19" x2="12" y2="5"></line>
                                 <polyline points="5 12 12 5 19 12"></polyline>
                             </svg>
                            </div>`,
-                    iconSize: [24, 24],
-                    iconAnchor: [12, 12]
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14]
                 });
                 L.marker([userLat + dLat, userLng + dLng], { icon: arrowIcon }).addTo(windOverlayLayer);
             });
