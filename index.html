@@ -773,12 +773,14 @@
         function initMapView() {
             if (leafletMap) return; // Prevent duplicate instantiation
 
-            // Dark Matter Tile Layer for sleek ambient theme
+            const cartoApiKey = "cb1_4vd4_1_377c11fd11f29e9c8f3bfaf4";
+            
+            // Dark Matter Tile Layer with Carto API Key for authorized access
             leafletMap = L.map('wind-map', { zoomControl: false }).setView([userLat, userLng], 12);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            L.tileLayer(`https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?api_key=${cartoApiKey}`, {
                 maxZoom: 19,
                 subdomains: 'abcd',
-                attribution: '&copy; OpenStreetMap'
+                attribution: '&copy; OpenStreetMap &copy; CARTO'
             }).addTo(leafletMap);
 
             windOverlayLayer = L.layerGroup().addTo(leafletMap);
