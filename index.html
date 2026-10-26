@@ -88,9 +88,9 @@
             border-radius: 4px;
         }
 
-        /* Compass needle glow */
-        .compass-glow {
-            filter: drop-shadow(0px 0px 8px rgba(56, 189, 248, 0.6));
+        /* Pulsing map overlay pin */
+        .wind-marker-icon {
+            transition: transform 0.3s ease-out;
         }
     </style>
 </head>
@@ -112,6 +112,11 @@
         </div>
 
         <div class="flex items-center space-x-2">
+            <!-- Sensor Permission/Status Indicator -->
+            <button id="gyro-perm-btn" onclick="requestGyroPermission()" class="text-[10px] bg-sky-500/20 border border-sky-500/40 text-sky-300 px-2 py-1 rounded-lg flex items-center space-x-1 hover:bg-sky-500/30">
+                <i data-lucide="compass" class="w-3 h-3"></i>
+                <span id="gyro-btn-text">Enable Compass</span>
+            </button>
             <!-- Manual Refresh Button -->
             <button id="refresh-btn" onclick="fetchStationData(true)" class="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 active:scale-95 transition text-slate-300 border border-slate-700/50">
                 <i data-lucide="refresh-cw" class="w-4 h-4" id="refresh-icon"></i>
@@ -172,7 +177,7 @@
                 <div class="w-full flex items-center justify-between mb-2">
                     <div class="flex items-center space-x-2">
                         <i data-lucide="compass" class="w-4 h-4 text-sky-400"></i>
-                        <h2 class="text-xs font-bold text-white uppercase tracking-wider">Live Compass & Wind</h2>
+                        <h2 class="text-xs font-bold text-white uppercase tracking-wider">Live Gyro Compass & Wind</h2>
                     </div>
                     <div id="cardinal-badge" class="px-2.5 py-1 rounded-full bg-sky-500/20 border border-sky-500/40 text-[11px] font-bold text-sky-300 tracking-wider">
                         ---° --
@@ -226,25 +231,6 @@
                 </div>
             </div>
 
-            <!-- Environmental Indicators Row -->
-            <div class="grid grid-cols-3 gap-3">
-                <div class="glass-card rounded-2xl p-3 flex flex-col items-center justify-center text-center">
-                    <i data-lucide="sun" class="w-4 h-4 text-amber-400 mb-1"></i>
-                    <span class="text-[10px] font-semibold text-slate-400 uppercase">UV Index</span>
-                    <span id="val-uv" class="text-base font-bold text-white mt-0.5">--</span>
-                </div>
-                <div class="glass-card rounded-2xl p-3 flex flex-col items-center justify-center text-center">
-                    <i data-lucide="cloud-rain" class="w-4 h-4 text-sky-400 mb-1"></i>
-                    <span class="text-[10px] font-semibold text-slate-400 uppercase">Rainfall</span>
-                    <span id="val-rain" class="text-base font-bold text-white mt-0.5">-- <span class="text-[9px] font-normal text-slate-400">in</span></span>
-                </div>
-                <div class="glass-card rounded-2xl p-3 flex flex-col items-center justify-center text-center">
-                    <i data-lucide="zap" class="w-4 h-4 text-yellow-400 mb-1"></i>
-                    <span class="text-[10px] font-semibold text-slate-400 uppercase">Solar Rad</span>
-                    <span id="val-solar" class="text-base font-bold text-white mt-0.5">-- <span class="text-[9px] font-normal text-slate-400">W/m²</span></span>
-                </div>
-            </div>
-
         </section>
 
         <!-- TAB 2: Map View -->
@@ -254,9 +240,11 @@
                     <i data-lucide="map" class="w-4 h-4 text-sky-400"></i>
                     <h2 class="text-xs font-bold text-white uppercase tracking-wider">High-Res Satellite Map</h2>
                 </div>
-                <span class="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 animate-ping"></span> Live Station Marker
-                </span>
+                <div class="flex items-center space-x-2">
+                    <span id="map-wind-badge" class="text-[10px] font-semibold text-sky-300 bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 rounded-full flex items-center">
+                        <i data-lucide="navigation" class="w-3 h-3 mr-1 text-sky-400 inline"></i> <span id="map-wind-text">--° Wind Vector</span>
+                    </span>
+                </div>
             </div>
 
             <!-- Leaflet Map Canvas Container -->
@@ -367,6 +355,10 @@
             demoMode: localStorage.getItem('ambient_demo_mode') !== 'false' // default true
         };
 
+        // Real-time Phone Gyro Heading Tracking
+        let phoneHeading = 0;
+        let gyroActive = false;
+
         // Station Data Store
         let stationData = {
             temp: 68.5,
@@ -390,31 +382,89 @@
         let mapInstance = null;
         let mapMarker = null;
 
-        // Smooth Rotation Tracking for Compass Needle
+        // Forecast data vectors
         let forecastWindDirs = [230, 245, 260, 235];
         let forecastWindSpeeds = [9.2, 11.5, 10.8, 8.4];
-        let forecastAccumulatedRotations = [0, 0, 0, 0];
-        let forecastPrevTargets = [0, 0, 0, 0];
 
         // Initialize App
         window.onload = function() {
             lucide.createIcons();
             loadSettingsToUI();
             initCompassCanvas();
+            initGyroSensors();
             initMapView();
 
             // Initial fetch or simulate
             fetchStationData();
 
-            // Set up auto-refresh interval (every 10 seconds for dynamic feel)
+            // Auto-refresh interval for simulated/live updates
             setInterval(() => fetchStationData(false), 10000);
+
+            // High frequency compass canvas redraw loop (60fps) for fluid gyro tracking
+            function renderLoop() {
+                drawCompass();
+                requestAnimationFrame(renderLoop);
+            }
+            requestAnimationFrame(renderLoop);
 
             // Handle window resize for dynamic compass canvas scaling
             window.addEventListener('resize', () => {
                 resizeCompassCanvas();
-                drawCompass();
             });
         };
+
+        // Initialize Phone Compass / Orientation Sensors
+        function initGyroSensors() {
+            if (window.DeviceOrientationEvent) {
+                if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    // iOS requires permission request via user action
+                    document.getElementById('gyro-perm-btn').classList.remove('hidden');
+                } else {
+                    // Android & standard Web Orientation API
+                    window.addEventListener('deviceorientation', handleOrientation, true);
+                    document.getElementById('gyro-perm-btn').classList.add('hidden');
+                }
+            } else {
+                document.getElementById('gyro-perm-btn').classList.add('hidden');
+            }
+        }
+
+        function requestGyroPermission() {
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(response => {
+                        if (response === 'granted') {
+                            window.addEventListener('deviceorientation', handleOrientation, true);
+                            document.getElementById('gyro-btn-text').innerText = "Compass Active";
+                            document.getElementById('gyro-perm-btn').classList.add('bg-emerald-500/20', 'text-emerald-300');
+                            gyroActive = true;
+                        } else {
+                            alert("Compass permission denied. Using stationary orientation.");
+                        }
+                    })
+                    .catch(console.error);
+            }
+        }
+
+        function handleOrientation(event) {
+            let heading = event.alpha;
+            // Webkit compass heading for iOS safari
+            if (event.webkitCompassHeading) {
+                heading = event.webkitCompassHeading;
+            } else if (event.alpha !== null) {
+                heading = 360 - event.alpha; // Convert to clockwise
+            }
+
+            if (heading !== null && !isNaN(heading)) {
+                phoneHeading = heading;
+                gyroActive = true;
+                const btnText = document.getElementById('gyro-btn-text');
+                if (btnText && btnText.innerText !== "Compass Active") {
+                    btnText.innerText = "Compass Active";
+                    document.getElementById('gyro-perm-btn').classList.add('bg-emerald-500/20', 'text-emerald-300');
+                }
+            }
+        }
 
         // Load Saved Configuration into Settings Inputs
         function loadSettingsToUI() {
@@ -571,15 +621,20 @@
             document.getElementById('cardinal-badge').innerText = `${Math.round(stationData.windDir)}° ${cardinal}`;
             document.getElementById('val-wind-cardinal').innerText = `${cardinal} • SUSTAINED`;
 
-            // Humidity, Barometer, UV, Rain, Solar
+            // Humidity, Barometer
             document.getElementById('val-humidity').innerText = `${stationData.humidity}%`;
             document.getElementById('val-baro').innerText = `${stationData.baro.toFixed(2)} inHg`;
-            document.getElementById('val-uv').innerText = stationData.uv;
-            document.getElementById('val-rain').innerText = stationData.rain.toFixed(2);
-            document.getElementById('val-solar').innerText = stationData.solar;
 
-            // Trigger Canvas Compass Redraw
-            drawCompass();
+            // Map Wind Badge Overlay Update
+            document.getElementById('map-wind-text').innerText = `${Math.round(stationData.windDir)}° ${cardinal} (${speedVal.toFixed(1)} ${config.speedUnit})`;
+
+            // Update Map Marker Wind Direction Icon
+            if (mapMarker) {
+                const markerEl = document.querySelector('.wind-marker-icon');
+                if (markerEl) {
+                    markerEl.style.transform = `rotate(${stationData.windDir}deg)`;
+                }
+            }
 
             // Render Next 4 Hours Forecast
             renderForecast();
@@ -698,7 +753,7 @@
             return map[key] || "Station Metric";
         }
 
-        // CANVAS COMPASS RENDERING SYSTEM
+        // CANVAS COMPASS RENDERING SYSTEM WITH REAL-TIME GYRO
         let compassCanvas, compassCtx;
 
         function initCompassCanvas() {
@@ -744,10 +799,12 @@
             compassCtx.lineWidth = 2;
             compassCtx.stroke();
 
-            // Draw Compass Ticks
+            // ROTATE ENTIRE DIAL BASED ON PHONE GYRO HEADING
             compassCtx.save();
             compassCtx.translate(cx, cy);
+            compassCtx.rotate((-phoneHeading) * (Math.PI / 180));
 
+            // Draw Compass Ticks relative to phone heading
             for (let deg = 0; deg < 360; deg += 10) {
                 const rad = (deg - 90) * (Math.PI / 180);
                 const isMajor = deg % 30 === 0;
@@ -766,7 +823,7 @@
                 compassCtx.stroke();
             }
 
-            // Draw Cardinal Labels (N, E, S, W)
+            // Draw Cardinal Labels (N, E, S, W) inside rotated dial
             const dpr = window.devicePixelRatio || 1;
             compassCtx.font = `bold ${Math.round(12 * dpr)}px Inter, sans-serif`;
             compassCtx.textAlign = 'center';
@@ -783,19 +840,22 @@
                 const rad = (c.angle - 90) * (Math.PI / 180);
                 const tx = (radius - 20) * Math.cos(rad);
                 const ty = (radius - 20) * Math.sin(rad);
+                
+                // Keep cardinal text upright even when dial turns
+                compassCtx.save();
+                compassCtx.translate(tx, ty);
+                compassCtx.rotate((phoneHeading) * (Math.PI / 180));
                 compassCtx.fillStyle = c.color;
-                compassCtx.fillText(c.label, tx, ty);
+                compassCtx.fillText(c.label, 0, 0);
+                compassCtx.restore();
             });
 
-            compassCtx.restore();
-
-            // Draw Wind Direction Arrow Vector
+            // Draw Station Wind Direction Arrow Vector relative to North
             const windAngle = stationData.windDir;
             compassCtx.save();
-            compassCtx.translate(cx, cy);
             compassCtx.rotate((windAngle - 90) * (Math.PI / 180));
 
-            // Main Arrow Head
+            // Main Wind Arrow Head
             compassCtx.beginPath();
             compassCtx.moveTo(radius - 10, 0);
             compassCtx.lineTo(-radius + 28, -10);
@@ -814,10 +874,11 @@
             compassCtx.fillStyle = '#ffffff';
             compassCtx.fill();
 
-            compassCtx.restore();
+            compassCtx.restore(); // Restore wind rotation
+            compassCtx.restore(); // Restore gyro rotation
         }
 
-        // Initialize Esri Satellite Map
+        // Initialize Esri Satellite Map with Dynamic Wind Direction Marker Overlay
         function initMapView() {
             if (mapInstance) return;
 
@@ -830,18 +891,24 @@
                 maxZoom: 19
             }).addTo(mapInstance);
 
-            const stationIcon = L.divIcon({
-                className: 'custom-station-icon',
-                html: `
-                    <div class="relative flex items-center justify-center">
-                        <div class="absolute w-8 h-8 rounded-full bg-sky-500/30 animate-ping"></div>
-                        <div class="w-6 h-6 rounded-full bg-sky-500 border-2 border-white shadow-lg flex items-center justify-center text-slate-950 font-bold text-[10px]">
-                            <i data-lucide="radio" class="w-3.5 h-3.5 text-slate-950"></i>
+            const windMarkerHtml = `
+                <div class="relative flex items-center justify-center w-12 h-12">
+                    <div class="absolute inset-0 rounded-full bg-sky-500/20 animate-ping"></div>
+                    <div class="w-10 h-10 rounded-full bg-slate-900/90 border-2 border-sky-400 shadow-xl flex items-center justify-center">
+                        <div class="wind-marker-icon flex items-center justify-center transition-transform duration-500" style="transform: rotate(${stationData.windDir}deg);">
+                            <svg class="w-6 h-6 text-sky-400 drop-shadow" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
+                            </svg>
                         </div>
                     </div>
-                `,
-                iconSize: [24, 24],
-                iconAnchor: [12, 12]
+                </div>
+            `;
+
+            const stationIcon = L.divIcon({
+                className: 'custom-station-icon',
+                html: windMarkerHtml,
+                iconSize: [48, 48],
+                iconAnchor: [24, 24]
             });
 
             mapMarker = L.marker([config.lat, config.lng], { icon: stationIcon }).addTo(mapInstance);
