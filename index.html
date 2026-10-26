@@ -65,7 +65,7 @@
             opacity: 1;
         }
 
-        /* Compass canvas rotation smoothing */
+        /* Compass canvas touch-action */
         canvas#compassCanvas {
             touch-action: none;
         }
@@ -91,16 +91,6 @@
         /* Compass needle glow */
         .compass-glow {
             filter: drop-shadow(0px 0px 8px rgba(56, 189, 248, 0.6));
-        }
-
-        /* Animated pulse ring */
-        @keyframes ringPulse {
-            0% { transform: scale(0.95); opacity: 0.8; }
-            50% { transform: scale(1.02); opacity: 0.4; }
-            100% { transform: scale(0.95); opacity: 0.8; }
-        }
-        .pulse-ring {
-            animation: ringPulse 3s infinite ease-in-out;
         }
     </style>
 </head>
@@ -136,7 +126,7 @@
         <div id="diagnostic-banner" class="hidden w-full bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-xs text-amber-300 flex items-center justify-between shrink-0">
             <div class="flex items-center space-x-2">
                 <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400 shrink-0"></i>
-                <span id="diagnostic-text">Using cached / simulated data mode.</span>
+                <span id="diagnostic-text">Using demo simulation mode.</span>
             </div>
             <button onclick="document.getElementById('diagnostic-banner').classList.add('hidden')" class="text-amber-400 hover:text-white">
                 <i data-lucide="x" class="w-4 h-4"></i>
@@ -177,44 +167,44 @@
                 </div>
             </div>
 
-            <!-- ENLARGED COMPASS & WIND SECTION -->
-            <div class="glass-panel rounded-3xl p-5 flex flex-col items-center justify-center relative overflow-hidden">
+            <!-- BALANCED COMPASS & WIND SECTION -->
+            <div class="glass-panel rounded-3xl p-4 flex flex-col items-center justify-center relative overflow-hidden">
                 <div class="w-full flex items-center justify-between mb-2">
                     <div class="flex items-center space-x-2">
-                        <i data-lucide="compass" class="w-5 h-5 text-sky-400"></i>
-                        <h2 class="text-sm font-bold text-white uppercase tracking-wider">Live Compass & Wind</h2>
+                        <i data-lucide="compass" class="w-4 h-4 text-sky-400"></i>
+                        <h2 class="text-xs font-bold text-white uppercase tracking-wider">Live Compass & Wind</h2>
                     </div>
-                    <div id="cardinal-badge" class="px-2.5 py-1 rounded-full bg-sky-500/20 border border-sky-500/40 text-xs font-bold text-sky-300 tracking-wider">
+                    <div id="cardinal-badge" class="px-2.5 py-1 rounded-full bg-sky-500/20 border border-sky-500/40 text-[11px] font-bold text-sky-300 tracking-wider">
                         ---° --
                     </div>
                 </div>
 
-                <!-- Enlarged Dynamic Canvas Container -->
-                <div class="relative my-2 flex items-center justify-center w-full max-w-[340px] aspect-square">
+                <!-- Balanced Dynamic Canvas Container -->
+                <div class="relative my-1 flex items-center justify-center w-full max-w-[220px] aspect-square">
                     <canvas id="compassCanvas" class="w-full h-full"></canvas>
                     
                     <!-- Center Overlay Telemetry readout inside compass ring -->
                     <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-                        <span id="val-wind-cardinal" class="text-xs font-bold uppercase tracking-widest text-sky-400">SUSTAINED</span>
-                        <span id="val-wind-speed" class="text-4xl font-extrabold text-white tracking-tight leading-none my-1">--</span>
-                        <span class="text-xs font-medium text-slate-400 unit-speed">MPH</span>
+                        <span id="val-wind-cardinal" class="text-[10px] font-bold uppercase tracking-widest text-sky-400">SUSTAINED</span>
+                        <span id="val-wind-speed" class="text-3xl font-extrabold text-white tracking-tight leading-none my-1">--</span>
+                        <span class="text-[10px] font-medium text-slate-400 unit-speed">MPH</span>
                     </div>
                 </div>
 
-                <!-- ENLARGED SUSTAINED & GUST STATS ROW -->
-                <div class="w-full grid grid-cols-2 gap-3 mt-3">
-                    <div class="bg-slate-900/80 p-3 rounded-2xl border border-slate-800 flex flex-col items-center justify-center text-center">
-                        <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Sustained Wind</span>
+                <!-- SUSTAINED & GUST STATS ROW -->
+                <div class="w-full grid grid-cols-2 gap-3 mt-2">
+                    <div class="bg-slate-900/80 p-2.5 rounded-2xl border border-slate-800 flex flex-col items-center justify-center text-center">
+                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Sustained Wind</span>
                         <div class="flex items-baseline space-x-1">
-                            <span id="val-wind-sustained-large" class="text-2xl font-black text-sky-400">--</span>
-                            <span class="text-xs text-slate-400 font-bold unit-speed">MPH</span>
+                            <span id="val-wind-sustained-large" class="text-xl font-black text-sky-400">--</span>
+                            <span class="text-[10px] text-slate-400 font-bold unit-speed">MPH</span>
                         </div>
                     </div>
-                    <div class="bg-slate-900/80 p-3 rounded-2xl border border-slate-800 flex flex-col items-center justify-center text-center">
-                        <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Peak Gust</span>
+                    <div class="bg-slate-900/80 p-2.5 rounded-2xl border border-slate-800 flex flex-col items-center justify-center text-center">
+                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Peak Gust</span>
                         <div class="flex items-baseline space-x-1">
-                            <span id="val-wind-gust" class="text-2xl font-black text-amber-400">--</span>
-                            <span class="text-xs text-slate-400 font-bold unit-speed">MPH</span>
+                            <span id="val-wind-gust" class="text-xl font-black text-amber-400">--</span>
+                            <span class="text-[10px] text-slate-400 font-bold unit-speed">MPH</span>
                         </div>
                     </div>
                 </div>
@@ -277,56 +267,17 @@
 
         <!-- TAB 3: Settings -->
         <section id="tab-settings" class="tab-content flex-1 flex-col overflow-y-auto p-4 space-y-4">
-            <div class="glass-panel rounded-2xl p-4 space-y-4">
-                <h2 class="text-sm font-bold text-white uppercase tracking-wider flex items-center space-x-2">
-                    <i data-lucide="sliders" class="w-4 h-4 text-sky-400"></i>
-                    <span>Station API Configuration</span>
-                </h2>
-
-                <div class="space-y-3">
-                    <div>
-                        <label class="text-xs font-semibold text-slate-300 block mb-1">Application Key</label>
-                        <input type="text" id="cfg-app-key" placeholder="Enter Ambient App Key" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500">
-                    </div>
-
-                    <div>
-                        <label class="text-xs font-semibold text-slate-300 block mb-1">User API Key</label>
-                        <input type="text" id="cfg-api-key" placeholder="Enter Ambient User Key" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500">
-                    </div>
-
-                    <div>
-                        <label class="text-xs font-semibold text-slate-300 block mb-1">Station MAC Address (Optional)</label>
-                        <input type="text" id="cfg-mac" placeholder="00:11:22:33:44:55" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500">
-                    </div>
-
-                    <div>
-                        <label class="text-xs font-semibold text-slate-300 block mb-1">Station Location (Lat, Lng for Map)</label>
-                        <div class="grid grid-cols-2 gap-2">
-                            <input type="number" step="0.0001" id="cfg-lat" placeholder="Latitude (e.g. 41.15)" class="bg-slate-900 border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500">
-                            <input type="number" step="0.0001" id="cfg-lng" placeholder="Longitude (e.g. -74.19)" class="bg-slate-900 border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500">
-                        </div>
-                    </div>
-
-                    <div class="pt-2">
-                        <button onclick="saveSettings()" class="w-full bg-sky-500 hover:bg-sky-400 active:scale-[0.98] transition font-bold text-xs text-slate-950 py-2.5 rounded-xl uppercase tracking-wider flex items-center justify-center space-x-1.5">
-                            <i data-lucide="save" class="w-4 h-4"></i>
-                            <span>Save & Reconnect</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
             <!-- Demo Mode & Simulation Settings -->
             <div class="glass-panel rounded-2xl p-4 space-y-3">
                 <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center space-x-2">
                     <i data-lucide="cpu" class="w-4 h-4 text-emerald-400"></i>
-                    <span>Simulation & Offline Mode</span>
+                    <span>Simulation & Demo Mode</span>
                 </h3>
 
                 <div class="flex items-center justify-between py-1">
                     <div>
                         <span class="text-xs font-bold text-white block">Demo Simulation Mode</span>
-                        <span class="text-[10px] text-slate-400 block">Use realistic simulated weather data if API keys are not provided.</span>
+                        <span class="text-[10px] text-slate-400 block">Use realistic simulated weather data for demonstration.</span>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" id="cfg-demo-toggle" class="sr-only peer" onchange="toggleDemoMode(this.checked)">
@@ -407,20 +358,13 @@
 
     <!-- JavaScript Application Logic -->
     <script>
-        // Default API Keys & Settings
-        const DEFAULT_APP_KEY = "cb1_4vd4_1_377c11fd11f29e9c8f3bfaf4";
-        const DEFAULT_API_KEY = "";
-
         // App State
         let config = {
-            appKey: localStorage.getItem('ambient_app_key') || DEFAULT_APP_KEY,
-            apiKey: localStorage.getItem('ambient_api_key') || DEFAULT_API_KEY,
-            mac: localStorage.getItem('ambient_mac') || '',
-            lat: parseFloat(localStorage.getItem('ambient_lat')) || 41.15,
-            lng: parseFloat(localStorage.getItem('ambient_lng')) || -74.19,
+            lat: 41.15,
+            lng: -74.19,
             tempUnit: localStorage.getItem('ambient_unit_temp') || 'f',
             speedUnit: localStorage.getItem('ambient_unit_speed') || 'mph',
-            demoMode: localStorage.getItem('ambient_demo_mode') === 'true'
+            demoMode: localStorage.getItem('ambient_demo_mode') !== 'false' // default true
         };
 
         // Station Data Store
@@ -447,7 +391,6 @@
         let mapMarker = null;
 
         // Smooth Rotation Tracking for Compass Needle
-        let currentNeedleAngle = 0;
         let forecastWindDirs = [230, 245, 260, 235];
         let forecastWindSpeeds = [9.2, 11.5, 10.8, 8.4];
         let forecastAccumulatedRotations = [0, 0, 0, 0];
@@ -463,8 +406,8 @@
             // Initial fetch or simulate
             fetchStationData();
 
-            // Set up auto-refresh interval (every 30 seconds)
-            setInterval(() => fetchStationData(false), 30000);
+            // Set up auto-refresh interval (every 10 seconds for dynamic feel)
+            setInterval(() => fetchStationData(false), 10000);
 
             // Handle window resize for dynamic compass canvas scaling
             window.addEventListener('resize', () => {
@@ -475,32 +418,9 @@
 
         // Load Saved Configuration into Settings Inputs
         function loadSettingsToUI() {
-            document.getElementById('cfg-app-key').value = config.appKey;
-            document.getElementById('cfg-api-key').value = config.apiKey;
-            document.getElementById('cfg-mac').value = config.mac;
-            document.getElementById('cfg-lat').value = config.lat;
-            document.getElementById('cfg-lng').value = config.lng;
             document.getElementById('cfg-unit-temp').value = config.tempUnit;
             document.getElementById('cfg-unit-speed').value = config.speedUnit;
             document.getElementById('cfg-demo-toggle').checked = config.demoMode;
-        }
-
-        // Save Settings
-        function saveSettings() {
-            config.appKey = document.getElementById('cfg-app-key').value.trim();
-            config.apiKey = document.getElementById('cfg-api-key').value.trim();
-            config.mac = document.getElementById('cfg-mac').value.trim();
-            config.lat = parseFloat(document.getElementById('cfg-lat').value) || 41.15;
-            config.lng = parseFloat(document.getElementById('cfg-lng').value) || -74.19;
-
-            localStorage.setItem('ambient_app_key', config.appKey);
-            localStorage.setItem('ambient_api_key', config.apiKey);
-            localStorage.setItem('ambient_mac', config.mac);
-            localStorage.setItem('ambient_lat', config.lat);
-            localStorage.setItem('ambient_lng', config.lng);
-
-            showBanner("Settings saved! Reconnecting to API...", "info");
-            fetchStationData(true);
         }
 
         function toggleDemoMode(enabled) {
@@ -519,119 +439,37 @@
             updateUI();
         }
 
-        // Fetch Ambient Station Data
+        // Fetch or Simulate Station Data
         async function fetchStationData(manualTrigger = false) {
             const refreshIcon = document.getElementById('refresh-icon');
             if (refreshIcon) refreshIcon.classList.add('animate-spin');
 
-            if (config.demoMode || !config.appKey) {
+            if (config.demoMode) {
                 setTimeout(() => {
                     simulateLiveSample();
                     showBanner("Running in Demo Simulation Mode", "info");
                     if (refreshIcon) refreshIcon.classList.remove('animate-spin');
-                }, 500);
+                }, 300);
                 return;
             }
 
-            let endpoint = `https://api.ambientweather.net/v1/devices?applicationKey=${config.appKey}`;
-            if (config.apiKey) {
-                endpoint += `&apiKey=${config.apiKey}`;
-            }
-
-            const proxies = [
-                (url) => url,
-                (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-                (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
-            ];
-
-            let success = false;
-
-            for (const getUrl of proxies) {
-                try {
-                    const targetUrl = getUrl(endpoint);
-                    const response = await fetch(targetUrl, { signal: AbortSignal.timeout(6000) });
-
-                    if (!response.ok) continue;
-
-                    const data = await response.json();
-                    if (Array.isArray(data) && data.length > 0) {
-                        const targetDevice = config.mac 
-                            ? data.find(d => d.macAddress && d.macAddress.toLowerCase() === config.mac.toLowerCase()) || data[0]
-                            : data[0];
-
-                        parseStationPayload(targetDevice);
-                        success = true;
-                        hideBanner();
-                        break;
-                    }
-                } catch (err) {
-                    console.warn("Proxy attempt failed:", err);
-                }
-            }
-
-            if (!success) {
-                simulateLiveSample();
-                showBanner("Could not reach Ambient API. Showing simulated live data.", "warning");
-            }
-
+            simulateLiveSample();
             if (refreshIcon) refreshIcon.classList.remove('animate-spin');
         }
 
-        // Parse API Payload
-        function parseStationPayload(device) {
-            if (!device || !device.lastData) return;
-
-            rawApiResponse = device;
-            const d = device.lastData;
-
-            stationData = {
-                temp: d.tempf !== undefined ? d.tempf : 70.0,
-                feelsLike: d.feelsLike !== undefined ? d.feelsLike : (d.tempf || 70.0),
-                tempMax: d.tempmaxf !== undefined ? d.tempmaxf : (d.tempf || 70.0) + 5,
-                tempMin: d.tempminf !== undefined ? d.tempminf : (d.tempf || 70.0) - 5,
-                windDir: d.winddir !== undefined ? d.winddir : 0,
-                windSpeed: d.windspeedmph !== undefined ? d.windspeedmph : 0,
-                windGust: d.windgustmph !== undefined ? d.windgustmph : 0,
-                humidity: d.humidity !== undefined ? d.humidity : 50,
-                baro: d.baromrelin !== undefined ? d.baromrelin : 29.92,
-                uv: d.uv !== undefined ? d.uv : 0,
-                solar: d.solarradiation !== undefined ? d.solarradiation : 0,
-                rain: d.dailyrainin !== undefined ? d.dailyrainin : 0,
-                mac: device.macAddress || "Station",
-                name: device.info ? device.info.name : "My Ambient Station",
-                lastUpdated: d.date ? new Date(d.date) : new Date()
-            };
-
-            // Update projected hourly wind directions & speeds
-            forecastWindDirs = [
-                (stationData.windDir + 10) % 360,
-                (stationData.windDir + 25) % 360,
-                (stationData.windDir + 40) % 360,
-                (stationData.windDir + 15) % 360
-            ];
-
-            forecastWindSpeeds = [
-                Math.max(0, stationData.windSpeed + 0.8),
-                Math.max(0, stationData.windSpeed + 2.1),
-                Math.max(0, stationData.windSpeed + 1.4),
-                Math.max(0, stationData.windSpeed - 0.5)
-            ];
-
-            updateUI();
-        }
-
-        // Simulate Sample Data if API key is missing or offline
+        // Simulate Live Sample Data with continuous dynamic fluctuations
         function simulateLiveSample() {
             const now = new Date();
-            const baseTemp = 68.5 + (Math.sin(now.getTime() / 100000) * 4);
-            const windDir = (220 + Math.floor(Math.sin(now.getTime() / 20000) * 35)) % 360;
-            const windSpeed = Math.max(1, 8.5 + Math.sin(now.getTime() / 15000) * 4);
+            const timeFactor = now.getTime() / 5000;
+            const baseTemp = 68.5 + (Math.sin(timeFactor / 10) * 3);
+            const windDir = Math.floor((220 + (Math.sin(timeFactor / 6) * 45) + 360)) % 360;
+            const windSpeed = Math.max(1.5, 8.5 + (Math.sin(timeFactor / 4) * 4.2));
 
             stationData = {
                 temp: baseTemp,
-                feelsLike: baseTemp + 1.5,
-                tempMax: baseTemp + 6,
-                tempMin: baseTemp - 5,
+                feelsLike: baseTemp + 1.2,
+                tempMax: baseTemp + 5.5,
+                tempMin: baseTemp - 4.2,
                 windDir: windDir,
                 windSpeed: windSpeed,
                 windGust: windSpeed + 4.8,
@@ -641,7 +479,7 @@
                 solar: 420,
                 rain: 0.05,
                 mac: "SIM-00:11:22:33",
-                name: "Demo Station",
+                name: "Hunting Ridge Station",
                 lastUpdated: now
             };
 
@@ -788,18 +626,6 @@
 
             container.innerHTML = html;
             if (window.lucide) lucide.createIcons();
-
-            // Apply unwrapped smooth angles to forecast arrows
-            for (let i = 1; i <= 4; i++) {
-                const arrowEl = document.getElementById(`forecast-arrow-${i}`);
-                if (arrowEl) {
-                    const rawTarget = forecastWindDirs[i - 1] || 0;
-                    const unwrapped = getUnwrappedAngle(forecastPrevTargets[i - 1], rawTarget, forecastAccumulatedRotations[i - 1]);
-                    forecastPrevTargets[i - 1] = rawTarget;
-                    forecastAccumulatedRotations[i - 1] = unwrapped;
-                    arrowEl.style.transform = `rotate(${unwrapped}deg)`;
-                }
-            }
         }
 
         // Render All Data Values Tab Content
@@ -853,7 +679,6 @@
             });
         }
 
-        // Helper: Human-readable descriptions for API field names
         function getReadableFieldName(key) {
             const map = {
                 tempf: "Outdoor Temperature (°F)",
@@ -863,20 +688,12 @@
                 winddir: "Wind Direction (Degrees)",
                 windspeedmph: "Sustained Wind Speed (mph)",
                 windgustmph: "Peak Wind Gust (mph)",
-                maxdailygust: "Max Daily Wind Gust (mph)",
                 baromrelin: "Relative Pressure (inHg)",
-                baromabsin: "Absolute Pressure (inHg)",
                 solarradiation: "Solar Radiation (W/m²)",
                 uv: "UV Index",
-                rainratein: "Rain Rate (in/hr)",
                 dailyrainin: "Daily Rain Total (in)",
-                weeklyrainin: "Weekly Rain Total (in)",
-                monthlyrainin: "Monthly Rain Total (in)",
-                yearlyrainin: "Yearly Rain Total (in)",
                 feelsLike: "Feels Like Temp (°F)",
-                dewPoint: "Dew Point (°F)",
-                date: "UTC Timestamp",
-                battout: "Outdoor Sensor Battery Status"
+                date: "UTC Timestamp"
             };
             return map[key] || "Station Metric";
         }
@@ -907,14 +724,14 @@
             const size = Math.min(w, h);
             const cx = w / 2;
             const cy = h / 2;
-            const radius = (size / 2) - 16;
+            const radius = (size / 2) - 12;
 
             compassCtx.clearRect(0, 0, w, h);
 
             // Draw outer metallic ring
             compassCtx.beginPath();
-            compassCtx.arc(cx, cy, radius + 8, 0, Math.PI * 2);
-            compassCtx.strokeStyle = 'rgba(56, 189, 248, 0.2)';
+            compassCtx.arc(cx, cy, radius + 6, 0, Math.PI * 2);
+            compassCtx.strokeStyle = 'rgba(56, 189, 248, 0.25)';
             compassCtx.lineWidth = 2;
             compassCtx.stroke();
 
@@ -927,14 +744,14 @@
             compassCtx.lineWidth = 2;
             compassCtx.stroke();
 
-            // Draw Compass Ticks & Degree Markings
+            // Draw Compass Ticks
             compassCtx.save();
             compassCtx.translate(cx, cy);
 
             for (let deg = 0; deg < 360; deg += 10) {
                 const rad = (deg - 90) * (Math.PI / 180);
                 const isMajor = deg % 30 === 0;
-                const tickLen = isMajor ? 12 : 6;
+                const tickLen = isMajor ? 10 : 5;
 
                 const x1 = (radius - tickLen) * Math.cos(rad);
                 const y1 = (radius - tickLen) * Math.sin(rad);
@@ -951,7 +768,7 @@
 
             // Draw Cardinal Labels (N, E, S, W)
             const dpr = window.devicePixelRatio || 1;
-            compassCtx.font = `bold ${Math.round(14 * dpr)}px Inter, sans-serif`;
+            compassCtx.font = `bold ${Math.round(12 * dpr)}px Inter, sans-serif`;
             compassCtx.textAlign = 'center';
             compassCtx.textBaseline = 'middle';
 
@@ -964,8 +781,8 @@
 
             cardinals.forEach(c => {
                 const rad = (c.angle - 90) * (Math.PI / 180);
-                const tx = (radius - 24) * Math.cos(rad);
-                const ty = (radius - 24) * Math.sin(rad);
+                const tx = (radius - 20) * Math.cos(rad);
+                const ty = (radius - 20) * Math.sin(rad);
                 compassCtx.fillStyle = c.color;
                 compassCtx.fillText(c.label, tx, ty);
             });
@@ -980,20 +797,20 @@
 
             // Main Arrow Head
             compassCtx.beginPath();
-            compassCtx.moveTo(radius - 12, 0);
-            compassCtx.lineTo(-radius + 35, -12);
-            compassCtx.lineTo(-radius + 45, 0);
-            compassCtx.lineTo(-radius + 35, 12);
+            compassCtx.moveTo(radius - 10, 0);
+            compassCtx.lineTo(-radius + 28, -10);
+            compassCtx.lineTo(-radius + 36, 0);
+            compassCtx.lineTo(-radius + 28, 10);
             compassCtx.closePath();
 
             compassCtx.fillStyle = '#38bdf8';
             compassCtx.shadowColor = 'rgba(56, 189, 248, 0.6)';
-            compassCtx.shadowBlur = 12;
+            compassCtx.shadowBlur = 10;
             compassCtx.fill();
 
             // Tail Accent
             compassCtx.beginPath();
-            compassCtx.arc(-radius + 45, 0, 4, 0, Math.PI * 2);
+            compassCtx.arc(-radius + 36, 0, 3.5, 0, Math.PI * 2);
             compassCtx.fillStyle = '#ffffff';
             compassCtx.fill();
 
@@ -1009,12 +826,10 @@
                 attributionControl: false
             }).setView([config.lat, config.lng], 14);
 
-            // Esri World Imagery Satellite Tiles
             L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                 maxZoom: 19
             }).addTo(mapInstance);
 
-            // Custom SVG Station Marker
             const stationIcon = L.divIcon({
                 className: 'custom-station-icon',
                 html: `
@@ -1036,7 +851,6 @@
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
 
-            // Reset navigation tab button highlights
             ['dashboard', 'map', 'settings', 'alldata'].forEach(id => {
                 const btn = document.getElementById(`nav-btn-${id}`);
                 if (btn) {
@@ -1064,7 +878,6 @@
             }
         }
 
-        // Diagnostic Banner Helper
         function showBanner(text, type = "info") {
             const banner = document.getElementById('diagnostic-banner');
             const textEl = document.getElementById('diagnostic-text');
@@ -1074,24 +887,10 @@
             }
         }
 
-        function hideBanner() {
-            const banner = document.getElementById('diagnostic-banner');
-            if (banner) banner.classList.add('hidden');
-        }
-
-        // Cardinal Direction Helper
         function getCardinalDirection(angle) {
             const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
             const index = Math.round(((angle %= 360) < 0 ? angle + 360 : angle) / 22.5) % 16;
             return directions[index];
-        }
-
-        // Unwrapped Rotation Helper for continuous smooth spinner transitions
-        function getUnwrappedAngle(prevTarget, target, currentAccumulated) {
-            let diff = (target - prevTarget) % 360;
-            if (diff > 180) diff -= 360;
-            if (diff < -180) diff += 360;
-            return currentAccumulated + diff;
         }
     </script>
 </body>
