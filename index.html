@@ -37,10 +37,6 @@
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         * { -webkit-tap-highlight-color: transparent; user-select: none; }
         input { user-select: text; }
-        
-        .compass-needle {
-            transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
     </style>
 </head>
 <body class="h-full font-sans antialiased text-slate-100 bg-slate-950 sm:py-6 flex justify-center items-center overflow-hidden">
@@ -141,30 +137,9 @@
                     </div>
 
                     <div class="grid grid-cols-2 gap-4 items-center pt-1">
-                        <!-- Compass Visual -->
+                        <!-- Canvas Native Compass Visual (Zero CSS Transition Flips) -->
                         <div class="relative w-36 h-36 mx-auto flex items-center justify-center">
-                            <!-- Outer Rotating Dial (Responds to Phone Orientation Heading) -->
-                            <div id="compass-dial" class="absolute inset-0 rounded-full border-2 border-slate-700/80 flex items-center justify-center transition-transform duration-200 ease-out">
-                                <span class="absolute top-1 text-[10px] font-bold text-slate-400">N</span>
-                                <span class="absolute right-1.5 text-[10px] font-bold text-slate-500">E</span>
-                                <span class="absolute bottom-1 text-[10px] font-bold text-slate-500">S</span>
-                                <span class="absolute left-1.5 text-[10px] font-bold text-slate-500">W</span>
-                                <div class="w-28 h-28 rounded-full border border-dashed border-slate-700/60 flex items-center justify-center"></div>
-                            </div>
-
-                            <!-- Rotating Wind Needle (Points to Actual Wind Origin relative to Phone Heading) -->
-                            <div id="compass-needle" class="compass-needle absolute inset-0 flex items-center justify-center pointer-events-none">
-                                <div class="w-1.5 h-28 flex flex-col justify-between items-center">
-                                    <div class="w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-b-[14px] border-b-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]"></div>
-                                    <div class="w-2 h-2 rounded-full bg-cyan-400"></div>
-                                </div>
-                            </div>
-
-                            <!-- Speed Core Display -->
-                            <div class="absolute w-16 h-16 rounded-full bg-slate-900 border border-slate-700 flex flex-col items-center justify-center shadow-lg z-10 pointer-events-none">
-                                <span id="wind-speed" class="text-lg font-black text-white leading-none">0.0</span>
-                                <span class="text-[9px] text-slate-400 font-bold mt-0.5 uppercase unit-speed">mph</span>
-                            </div>
+                            <canvas id="compass-canvas" width="280" height="280" class="w-36 h-36 block"></canvas>
                         </div>
 
                         <!-- Wind Speeds Card -->
@@ -195,7 +170,7 @@
                             <i data-lucide="clock-4" class="w-4 h-4 text-ambient-accent"></i>
                             <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">Next 4 Hours Forecast</h3>
                         </div>
-                        <span id="forecast-subtitle" class="text-[10px] text-slate-400">Hourly Trend</span>
+                        <span id="forecast-subtitle" class="text-[10px] text-slate-400">Relative Wind Trend</span>
                     </div>
 
                     <div id="forecast-hourly-container" class="grid grid-cols-4 gap-2">
@@ -301,13 +276,13 @@
         let config = {
             appKey: localStorage.getItem('ambient_app_key') || HARDCODED_APP_KEY,
             userKey: localStorage.getItem('ambient_user_key') || HARDCODED_DEVICE_KEY,
-            useDemo: localStorage.getItem('ambient_demo_mode') === 'true',
+            useDemo: false,
             tempUnit: localStorage.getItem('ambient_temp_unit') || 'F',
             speedUnit: localStorage.getItem('ambient_speed_unit') || 'mph'
         };
 
         let deviceHeading = 0; // Phone compass bearing in degrees
-        let hasHeadingSensor = false;
+        let forecastWindDirs = [0, 0, 0, 0]; // Forecast directions
 
         let stationData = {
             temp: null,
@@ -330,14 +305,14 @@
         // Real-Time Phone Compass Orientation Listener
         function initCompassSensor() {
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                // iOS 13+ requires explicit permission request
                 const btn = document.getElementById('btn-enable-heading');
                 if (btn) btn.classList.remove('hidden');
             } else if ('ondeviceorientationabsolute' in window || 'ondeviceorientation' in window) {
-                // Android / Standard Browsers
                 window.addEventListener('deviceorientationabsolute', handleOrientation, true);
                 window.addEventListener('deviceorientation', handleOrientation, true);
             }
+            // Continuous animation loop for zero-lag compass rendering
+            requestAnimationFrame(drawCompassCanvas);
         }
 
         function requestCompassPermission() {
@@ -361,31 +336,141 @@
             let heading = null;
 
             if (event.webkitCompassHeading) {
-                // iOS compass heading
                 heading = event.webkitCompassHeading;
             } else if (event.alpha !== null) {
-                // Android heading calculation
                 heading = event.absolute ? (360 - event.alpha) : (360 - event.alpha);
             }
 
             if (heading !== null && !isNaN(heading)) {
                 deviceHeading = heading;
-                hasHeadingSensor = true;
-                updateCompassVisuals();
+                updateForecastArrowOrientations();
             }
         }
 
-        function updateCompassVisuals() {
-            const dial = document.getElementById('compass-dial');
-            const needle = document.getElementById('compass-needle');
+        // Canvas Rendering (Direct trigonometry, zero CSS transition jumps/spins)
+        function drawCompassCanvas() {
+            const canvas = document.getElementById('compass-canvas');
+            if (!canvas) {
+                requestAnimationFrame(drawCompassCanvas);
+                return;
+            }
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+            const cx = w / 2;
+            const cy = h / 2;
+            const radius = w / 2 - 12;
 
-            if (dial && needle) {
-                // Rotate dial so North points to actual physical North based on phone orientation
-                dial.style.transform = `rotate(${-deviceHeading}deg)`;
-                
-                // Rotate needle to wind direction minus device heading so vector remains true in real space
-                const netWindRotation = stationData.windDir - deviceHeading;
-                needle.style.transform = `rotate(${netWindRotation}deg)`;
+            ctx.clearRect(0, 0, w, h);
+
+            // 1. Draw Outer Dial Ring
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate((-deviceHeading * Math.PI) / 180);
+
+            // Outer Circle
+            ctx.beginPath();
+            ctx.arc(0, 0, radius, 0, Math.PI * 2);
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+
+            // Inner Dashed Ring
+            ctx.beginPath();
+            ctx.arc(0, 0, radius - 12, 0, Math.PI * 2);
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Cardinal Markers
+            const labels = [
+                { text: 'N', angle: 0, color: '#f87171' },
+                { text: 'E', angle: 90, color: '#94a3b8' },
+                { text: 'S', angle: 180, color: '#94a3b8' },
+                { text: 'W', angle: 270, color: '#94a3b8' }
+            ];
+
+            ctx.font = 'bold 16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            labels.forEach(item => {
+                const rad = (item.angle * Math.PI) / 180;
+                const tx = (radius - 22) * Math.sin(rad);
+                const ty = -(radius - 22) * Math.cos(rad);
+                ctx.fillStyle = item.color;
+                ctx.fillText(item.text, tx, ty);
+            });
+
+            ctx.restore();
+
+            // 2. Draw Rotating Wind Arrow Pointer (Vector relative to device heading)
+            const netWindAngle = stationData.windDir - deviceHeading;
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate((netWindAngle * Math.PI) / 180);
+
+            // Arrow Head pointing in wind direction
+            ctx.beginPath();
+            ctx.moveTo(0, -(radius - 12));
+            ctx.lineTo(-10, -(radius - 28));
+            ctx.lineTo(10, -(radius - 28));
+            ctx.closePath();
+            ctx.fillStyle = '#22d3ee';
+            ctx.shadowColor = 'rgba(34,211,238,0.8)';
+            ctx.shadowBlur = 10;
+            ctx.fill();
+
+            // Tail
+            ctx.beginPath();
+            ctx.arc(0, 0, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#22d3ee';
+            ctx.fill();
+
+            ctx.restore();
+
+            // 3. Draw Center Wind Speed Dial Overlay
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.beginPath();
+            ctx.arc(0, 0, 34, 0, Math.PI * 2);
+            ctx.fillStyle = '#0f172a';
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 2;
+            ctx.shadowColor = 'transparent';
+            ctx.fill();
+            ctx.stroke();
+
+            // Speed Number
+            let speedDisplay = stationData.windSpeed;
+            if (config.speedUnit === 'kmh') speedDisplay *= 1.60934;
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'black 22px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(speedDisplay.toFixed(1), 0, -4);
+
+            // Speed Unit
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = 'bold 10px sans-serif';
+            ctx.fillText(config.speedUnit.toUpperCase(), 0, 14);
+
+            ctx.restore();
+
+            requestAnimationFrame(drawCompassCanvas);
+        }
+
+        // Dynamic 4-Hour Forecast Arrow Rotation based on Live Compass Heading
+        function updateForecastArrowOrientations() {
+            for (let i = 1; i <= 4; i++) {
+                const arrowEl = document.getElementById(`forecast-arrow-${i}`);
+                if (arrowEl) {
+                    const relativeDir = forecastWindDirs[i - 1] - deviceHeading;
+                    arrowEl.style.transform = `rotate(${relativeDir}deg)`;
+                }
             }
         }
 
@@ -457,7 +542,6 @@
                     }
                 } catch (err) {
                     lastError = err;
-                    // Silently try next proxy gateway
                 }
             }
             throw lastError || new Error("All proxy gateways failed or were blocked by CORS.");
@@ -471,7 +555,7 @@
             const appKey = config.appKey.trim();
             const apiKey = config.userKey.trim();
 
-            if (!config.useDemo && appKey && apiKey) {
+            if (appKey && apiKey) {
                 try {
                     setStatusBanner('info', 'Connecting to Station', 'Querying api.ambientweather.net/v1/devices...', 'FETCHING');
                     
@@ -500,19 +584,6 @@
                             lastUpdated: new Date(lastData.date || Date.now())
                         };
 
-                        // Optional: Try fetching historical trend if MAC is available
-                        if (stationData.mac) {
-                            try {
-                                const deviceHistoryUrl = `https://api.ambientweather.net/v1/devices/${stationData.mac}?applicationKey=${appKey}&apiKey=${apiKey}&limit=24`;
-                                const historyRes = await fetchWithProxyFallback(deviceHistoryUrl);
-                                if (Array.isArray(historyRes.data)) {
-                                    historicalTrend = historyRes.data;
-                                }
-                            } catch (e) {
-                                console.warn("Could not fetch historical device data:", e);
-                            }
-                        }
-
                         updateBadge(false);
                         const gatewayMethod = proxyIndex === 3 ? "Direct Fetch" : `Proxy Gate ${proxyIndex + 1}`;
                         setStatusBanner('success', `Station Online: ${stationData.name}`, `Live telemetry fetched successfully (${gatewayMethod}).`, 'HTTP 200');
@@ -521,12 +592,12 @@
                     }
                 } catch (err) {
                     const errorMsg = err?.message || "CORS or Network Fetch Error";
-                    updateBadge(true, "DEMO / OFFLINE");
+                    updateBadge(true, "SIMULATED DATA");
                     setStatusBanner('error', 'Live API Fetch Interrupted', `${errorMsg}. Displaying simulated telemetry.`, 'CORS/NETWORK');
                     simulateLiveSample();
                 }
             } else {
-                updateBadge(true, "DEMO MODE");
+                updateBadge(true, "SIMULATED DATA");
                 setStatusBanner('warning', 'Demo Mode Active', 'Using simulated station telemetry.', 'DEMO');
                 simulateLiveSample();
             }
@@ -592,15 +663,11 @@
                 gustDisplay *= 1.60934;
             }
 
-            document.getElementById('wind-speed').textContent = speedDisplay.toFixed(1);
             document.getElementById('wind-speed-alt').textContent = speedDisplay.toFixed(1);
             document.getElementById('wind-gust').textContent = gustDisplay.toFixed(1);
 
             const cardinal = getCardinalDirection(stationData.windDir);
             document.getElementById('wind-dir-text').textContent = `${cardinal} (${stationData.windDir}°)`;
-            
-            // Trigger updated compass positioning taking device orientation into account
-            updateCompassVisuals();
 
             document.getElementById('metric-humidity').textContent = stationData.humidity !== null ? `${stationData.humidity}%` : '--%';
             document.getElementById('metric-baro').textContent = stationData.baro !== null ? `${stationData.baro} inHg` : '-- inHg';
@@ -630,15 +697,19 @@
                 const hourTemp = config.tempUnit === 'C' ? (hourTempF - 32) * 5 / 9 : hourTempF;
                 
                 const hourDir = (stationData.windDir + i * 15) % 360;
+                forecastWindDirs[i - 1] = hourDir; // Save for real-time compass rotation
+
                 let hourSpeed = (stationData.windSpeed || 5) + (i % 2 === 0 ? 1.2 : -0.8);
                 if (config.speedUnit === 'kmh') hourSpeed *= 1.60934;
+
+                const relativeDir = hourDir - deviceHeading;
 
                 html += `
                     <div class="bg-slate-900/80 border border-slate-700/50 rounded-2xl p-2.5 flex flex-col items-center justify-between space-y-2">
                         <span class="text-[10px] font-bold text-slate-400 uppercase">${formattedHour}</span>
                         <div class="text-sm font-black text-white">${hourTemp.toFixed(0)}°</div>
                         
-                        <div class="my-1 text-ambient-accent" style="transform: rotate(${hourDir}deg)">
+                        <div id="forecast-arrow-${i}" class="my-1 text-ambient-accent transition-transform duration-75" style="transform: rotate(${relativeDir}deg)">
                             <i data-lucide="arrow-up" class="w-3.5 h-3.5"></i>
                         </div>
 
@@ -650,6 +721,7 @@
             }
             container.innerHTML = html;
             lucide.createIcons();
+            updateForecastArrowOrientations();
         }
 
         function switchTab(tabId) {
@@ -696,10 +768,6 @@
         }
 
         window.onload = function() {
-            // Guarantee fresh storage sync with provided keys
-            localStorage.setItem('ambient_app_key', config.appKey);
-            localStorage.setItem('ambient_user_key', config.userKey);
-            
             setTempUnit(config.tempUnit);
             setSpeedUnit(config.speedUnit);
 
