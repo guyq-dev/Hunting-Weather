@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ambient Weather Live Station</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        ambient: {
+                            50: '#f0f9ff',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#075985',
+                            accent: '#38bdf8',
+                            wind: '#06b6d4',
+                            temp: '#f97316'
+                        }
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'spin-slow': 'spin 12s linear infinite',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        * { -webkit-tap-highlight-color: transparent; user-select: none; }
+        input { user-select: text; }
+        
+        .compass-needle {
+            transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+    </style>
+</head>
+<body class="h-full font-sans antialiased text-slate-100 bg-slate-950 sm:py-6 flex justify-center items-center overflow-hidden">
+
+    <!-- Phone Shell / Container -->
+    <div id="phone-shell" class="relative w-full h-full sm:max-w-[420px] sm:h-[850px] bg-slate-900 sm:rounded-[48px] shadow-2xl ring-1 ring-slate-800 flex flex-col overflow-hidden">
+        
+        <!-- Top Status Bar -->
+        <div class="pt-3 px-7 pb-2 flex justify-between items-center text-xs font-semibold select-none z-50 text-slate-300">
+            <span id="status-clock">09:41</span>
+            <div class="hidden sm:block w-28 h-4 bg-black rounded-full absolute left-1/2 -translate-x-1/2 top-2 z-50"></div>
+            <div class="flex items-center space-x-2">
+                <span id="connection-badge" class="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">CONNECTING...</span>
+                <i data-lucide="wifi" class="w-3.5 h-3.5"></i>
+                <i data-lucide="battery" class="w-4 h-4"></i>
+            </div>
+        </div>
+
+        <!-- Header Bar -->
+        <header class="px-5 py-3 bg-slate-900/90 backdrop-blur-md border-b border-slate-800/80 flex justify-between items-center z-40 sticky top-0">
+            <div class="flex items-center space-x-3">
+                <div class="p-2 rounded-2xl bg-ambient-500/20 border border-ambient-500/30 text-ambient-accent">
+                    <i data-lucide="radio-tower" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h1 id="station-name" class="text-sm font-bold text-white leading-tight">Home Weather Station</h1>
+                    <p id="last-updated" class="text-[11px] text-slate-400 flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                        Initializing API...
+                    </p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-1">
+                <button onclick="fetchWeatherData()" class="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 active:scale-95 transition-all" title="Refresh Live Data">
+                    <i id="refresh-icon" data-lucide="refresh-cw" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Viewport -->
+        <main id="app-viewport" class="flex-1 overflow-y-auto no-scrollbar p-4 space-y-4">
+            
+            <!-- REALTIME DASHBOARD TAB -->
+            <section id="tab-dashboard" class="tab-content space-y-4">
+                
+                <!-- Connection & Debug Status Diagnostic Banner -->
+                <div id="api-status-banner" class="rounded-2xl p-3 text-xs border transition-all space-y-1 bg-slate-800/80 border-slate-700/60 text-slate-300">
+                    <div class="flex items-center justify-between font-bold">
+                        <span id="api-status-title" class="flex items-center gap-1.5">
+                            <i data-lucide="radio" class="w-4 h-4 text-ambient-accent"></i>
+                            Connecting to Weather Station
+                        </span>
+                        <span id="api-status-code" class="text-[10px] px-2 py-0.5 rounded-full bg-black/40 font-mono text-slate-300">QUERYING</span>
+                    </div>
+                    <p id="api-status-detail" class="text-[11px] opacity-90 leading-tight">Executing API query...</p>
+                </div>
+
+                <!-- Main Temperature Banner -->
+                <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-800/90 via-slate-800/60 to-slate-900 border border-slate-700/60 p-5 shadow-xl">
+                    <div class="absolute -right-6 -top-6 w-32 h-32 bg-ambient-500/10 rounded-full blur-2xl pointer-events-none"></div>
+                    
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Current Temp</span>
+                            <div class="flex items-baseline space-x-1 mt-1">
+                                <span id="current-temp" class="text-5xl font-black text-white tracking-tight">--</span>
+                                <span class="text-xl font-bold text-slate-400 unit-temp">°F</span>
+                            </div>
+                        </div>
+                        <div class="text-right space-y-1">
+                            <div class="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs font-medium text-slate-300">
+                                <i data-lucide="thermometer" class="w-3.5 h-3.5 mr-1 text-ambient-temp"></i>
+                                Feels <span id="feels-like" class="ml-1 font-bold text-white">--</span>
+                            </div>
+                            <div class="text-[11px] text-slate-400 pt-1">
+                                High: <span id="temp-max" class="text-white font-medium">--</span> • Low: <span id="temp-min" class="text-white font-medium">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Real-Time Wind Gauge & Compass -->
+                <div class="rounded-3xl bg-slate-800/80 border border-slate-700/60 p-5 shadow-xl space-y-4">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center space-x-2">
+                            <i data-lucide="wind" class="w-4 h-4 text-ambient-wind"></i>
+                            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">Real-Time Wind Vector</h2>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button id="btn-enable-heading" onclick="requestCompassPermission()" class="hidden text-[10px] px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold hover:bg-amber-500/30 transition-all flex items-center gap-1">
+                                <i data-lucide="compass" class="w-3 h-3"></i> Sync Compass
+                            </button>
+                            <span id="wind-dir-text" class="text-xs font-extrabold px-2.5 py-1 rounded-lg bg-ambient-500/20 text-ambient-accent border border-ambient-500/30">
+                                N/A (0°)
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 items-center pt-1">
+                        <!-- Compass Visual -->
+                        <div class="relative w-36 h-36 mx-auto flex items-center justify-center">
+                            <!-- Outer Rotating Dial (Responds to Phone Orientation Heading) -->
+                            <div id="compass-dial" class="absolute inset-0 rounded-full border-2 border-slate-700/80 flex items-center justify-center transition-transform duration-200 ease-out">
+                                <span class="absolute top-1 text-[10px] font-bold text-slate-400">N</span>
+                                <span class="absolute right-1.5 text-[10px] font-bold text-slate-500">E</span>
+                                <span class="absolute bottom-1 text-[10px] font-bold text-slate-500">S</span>
+                                <span class="absolute left-1.5 text-[10px] font-bold text-slate-500">W</span>
+                                <div class="w-28 h-28 rounded-full border border-dashed border-slate-700/60 flex items-center justify-center"></div>
+                            </div>
+
+                            <!-- Rotating Wind Needle (Points to Actual Wind Origin relative to Phone Heading) -->
+                            <div id="compass-needle" class="compass-needle absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <div class="w-1.5 h-28 flex flex-col justify-between items-center">
+                                    <div class="w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-b-[14px] border-b-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]"></div>
+                                    <div class="w-2 h-2 rounded-full bg-cyan-400"></div>
+                                </div>
+                            </div>
+
+                            <!-- Speed Core Display -->
+                            <div class="absolute w-16 h-16 rounded-full bg-slate-900 border border-slate-700 flex flex-col items-center justify-center shadow-lg z-10 pointer-events-none">
+                                <span id="wind-speed" class="text-lg font-black text-white leading-none">0.0</span>
+                                <span class="text-[9px] text-slate-400 font-bold mt-0.5 uppercase unit-speed">mph</span>
+                            </div>
+                        </div>
+
+                        <!-- Wind Speeds Card -->
+                        <div class="space-y-3">
+                            <div class="p-3 bg-slate-900/60 rounded-2xl border border-slate-700/50">
+                                <span class="text-[10px] font-medium text-slate-400 block uppercase">Sustained Wind</span>
+                                <div class="flex items-baseline space-x-1 mt-0.5">
+                                    <span id="wind-speed-alt" class="text-xl font-bold text-white">0.0</span>
+                                    <span class="text-xs text-slate-400 unit-speed">mph</span>
+                                </div>
+                            </div>
+                            
+                            <div class="p-3 bg-slate-900/60 rounded-2xl border border-slate-700/50">
+                                <span class="text-[10px] font-medium text-slate-400 block uppercase">Peak Wind Gust</span>
+                                <div class="flex items-baseline space-x-1 mt-0.5">
+                                    <span id="wind-gust" class="text-xl font-bold text-amber-400">0.0</span>
+                                    <span class="text-xs text-slate-400 unit-speed">mph</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Next 4 Hours Forecast / Historical Trend -->
+                <div class="rounded-3xl bg-slate-800/80 border border-slate-700/60 p-4 shadow-xl space-y-3">
+                    <div class="flex justify-between items-center px-1">
+                        <div class="flex items-center space-x-2">
+                            <i data-lucide="clock-4" class="w-4 h-4 text-ambient-accent"></i>
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">Next 4 Hours Forecast</h3>
+                        </div>
+                        <span id="forecast-subtitle" class="text-[10px] text-slate-400">Hourly Trend</span>
+                    </div>
+
+                    <div id="forecast-hourly-container" class="grid grid-cols-4 gap-2">
+                        <!-- Loaded by JS -->
+                    </div>
+                </div>
+
+                <!-- Extended Station Metrics Grid -->
+                <div class="rounded-3xl bg-slate-800/80 border border-slate-700/60 p-4 shadow-xl space-y-3">
+                    <div class="flex justify-between items-center px-1">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">Station Telemetry</h3>
+                        <i data-lucide="sliders" class="w-3.5 h-3.5 text-slate-400"></i>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <div class="p-3 bg-slate-900/60 rounded-2xl border border-slate-700/40">
+                            <div class="flex items-center space-x-2 text-slate-400 mb-1">
+                                <i data-lucide="droplets" class="w-3.5 h-3.5 text-blue-400"></i>
+                                <span class="text-[10px] font-medium uppercase">Humidity</span>
+                            </div>
+                            <span id="metric-humidity" class="text-lg font-bold text-white">--%</span>
+                        </div>
+
+                        <div class="p-3 bg-slate-900/60 rounded-2xl border border-slate-700/40">
+                            <div class="flex items-center space-x-2 text-slate-400 mb-1">
+                                <i data-lucide="gauge" class="w-3.5 h-3.5 text-purple-400"></i>
+                                <span class="text-[10px] font-medium uppercase">Pressure</span>
+                            </div>
+                            <span id="metric-baro" class="text-lg font-bold text-white">-- inHg</span>
+                        </div>
+
+                        <div class="p-3 bg-slate-900/60 rounded-2xl border border-slate-700/40">
+                            <div class="flex items-center space-x-2 text-slate-400 mb-1">
+                                <i data-lucide="sun" class="w-3.5 h-3.5 text-amber-400"></i>
+                                <span class="text-[10px] font-medium uppercase">Solar / UV</span>
+                            </div>
+                            <span id="metric-uv" class="text-lg font-bold text-white">-- UV</span>
+                            <span id="metric-solar" class="block text-[10px] text-slate-400">-- W/m²</span>
+                        </div>
+
+                        <div class="p-3 bg-slate-900/60 rounded-2xl border border-slate-700/40">
+                            <div class="flex items-center space-x-2 text-slate-400 mb-1">
+                                <i data-lucide="cloud-rain" class="w-3.5 h-3.5 text-cyan-400"></i>
+                                <span class="text-[10px] font-medium uppercase">Daily Rain</span>
+                            </div>
+                            <span id="metric-rain" class="text-lg font-bold text-white">-- in</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- API & SETTINGS TAB -->
+            <section id="tab-settings" class="tab-content hidden space-y-4">
+                <div class="rounded-3xl bg-slate-800/80 border border-slate-700/60 p-5 shadow-xl space-y-4">
+                    <div class="flex items-center space-x-3 pb-2 border-b border-slate-700/60">
+                        <i data-lucide="key" class="w-5 h-5 text-ambient-accent"></i>
+                        <div>
+                            <h3 class="text-sm font-bold text-white">Ambient Weather Keys</h3>
+                            <p class="text-[11px] text-slate-400">API credentials configured for your station</p>
+                        </div>
+                    </div>
+
+                    <form id="api-config-form" onsubmit="handleSaveKeys(event)" class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Application Key</label>
+                            <input type="text" id="input-app-key" required class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white font-mono focus:outline-none focus:ring-2 focus:ring-ambient-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Device / API Key</label>
+                            <input type="text" id="input-user-key" required class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white font-mono focus:outline-none focus:ring-2 focus:ring-ambient-500">
+                        </div>
+
+                        <div class="pt-2 flex items-center justify-between gap-2">
+                            <button type="submit" class="flex-1 py-2.5 bg-ambient-600 hover:bg-ambient-500 text-white rounded-xl text-xs font-bold shadow-md transition-all">
+                                Save & Sync Keys
+                            </button>
+                            <button type="button" onclick="toggleDemoMode()" id="btn-toggle-demo" class="px-3 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl text-xs font-medium">
+                                Demo Mode
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Display Units -->
+                <div class="rounded-3xl bg-slate-800/80 border border-slate-700/60 p-5 shadow-xl space-y-4">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">Preferences</h3>
+                    
+                    <div class="flex items-center justify-between py-2 border-b border-slate-700/50">
+                        <span class="text-xs text-slate-300 font-medium">Temperature Unit</span>
+                        <div class="flex bg-slate-900 p-1 rounded-xl border border-slate-700">
+                            <button onclick="setTempUnit('F')" id="unit-f" class="px-3 py-1 rounded-lg text-xs font-bold bg-ambient-500 text-white">°F</button>
+                            <button onclick="setTempUnit('C')" id="unit-c" class="px-3 py-1 rounded-lg text-xs font-bold text-slate-400">°C</button>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between py-2">
+                        <span class="text-xs text-slate-300 font-medium">Wind Speed Unit</span>
+                        <div class="flex bg-slate-900 p-1 rounded-xl border border-slate-700">
+                            <button onclick="setSpeedUnit('mph')" id="unit-mph" class="px-3 py-1 rounded-lg text-xs font-bold bg-ambient-500 text-white">mph</button>
+                            <button onclick="setSpeedUnit('kmh')" id="unit-kmh" class="px-3 py-1 rounded-lg text-xs font-bold text-slate-400">km/h</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Navigation Tabs -->
+        <nav class="bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-6 py-2 flex justify-around items-center z-40">
+            <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn active flex flex-col items-center py-1 px-4 rounded-xl text-ambient-accent transition-all">
+                <i data-lucide="gauge" class="w-5 h-5"></i>
+                <span class="text-[10px] font-semibold mt-1">Live Gauge</span>
+            </button>
+            <button onclick="switchTab('settings')" id="nav-settings" class="nav-btn flex flex-col items-center py-1 px-4 rounded-xl text-slate-400 hover:text-slate-200 transition-all">
+                <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
+                <span class="text-[10px] font-semibold mt-1">Settings</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed top-5 z-50 hidden transition-all duration-300 -translate-y-5 opacity-0">
+        <div class="bg-slate-800 text-white px-4 py-2.5 rounded-2xl shadow-2xl flex items-center space-x-2 border border-slate-700 text-xs font-medium">
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+            <span id="toast-message">Notification</span>
+        </div>
+    </div>
+
+    <script>
+        // Key Constants
+        const HARDCODED_APP_KEY = "f848e17eba814fc0b86853bba568cba4442f2d5bc846465bbb46bc64574cd8c6";
+        const HARDCODED_DEVICE_KEY = "0fcadb9f148641c5a5b0f07e0d913e084c0606f6fc304877aeee4e3723aa2604";
+
+        let config = {
+            appKey: localStorage.getItem('ambient_app_key') || HARDCODED_APP_KEY,
+            userKey: localStorage.getItem('ambient_user_key') || HARDCODED_DEVICE_KEY,
+            useDemo: localStorage.getItem('ambient_demo_mode') === 'true',
+            tempUnit: localStorage.getItem('ambient_temp_unit') || 'F',
+            speedUnit: localStorage.getItem('ambient_speed_unit') || 'mph'
+        };
+
+        let deviceHeading = 0; // Phone compass bearing in degrees
+        let hasHeadingSensor = false;
+
+        let stationData = {
+            temp: null,
+            feelsLike: null,
+            tempMax: null,
+            tempMin: null,
+            windDir: 0,
+            windSpeed: 0,
+            windGust: 0,
+            humidity: null,
+            baro: null,
+            uv: null,
+            solar: null,
+            rain: null,
+            mac: null,
+            name: "Ambient Station",
+            lastUpdated: new Date()
+        };
+
+        // Real-Time Phone Compass Orientation Listener
+        function initCompassSensor() {
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                // iOS 13+ requires explicit permission request
+                const btn = document.getElementById('btn-enable-heading');
+                if (btn) btn.classList.remove('hidden');
+            } else if ('ondeviceorientationabsolute' in window || 'ondeviceorientation' in window) {
+                // Android / Standard Browsers
+                window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+                window.addEventListener('deviceorientation', handleOrientation, true);
+            }
+        }
+
+        function requestCompassPermission() {
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === 'granted') {
+                            window.addEventListener('deviceorientation', handleOrientation, true);
+                            const btn = document.getElementById('btn-enable-heading');
+                            if (btn) btn.classList.add('hidden');
+                            showToast("Compass synchronized");
+                        } else {
+                            showToast("Compass permission denied");
+                        }
+                    })
+                    .catch(console.error);
+            }
+        }
+
+        function handleOrientation(event) {
+            let heading = null;
+
+            if (event.webkitCompassHeading) {
+                // iOS compass heading
+                heading = event.webkitCompassHeading;
+            } else if (event.alpha !== null) {
+                // Android heading calculation
+                heading = event.absolute ? (360 - event.alpha) : (360 - event.alpha);
+            }
+
+            if (heading !== null && !isNaN(heading)) {
+                deviceHeading = heading;
+                hasHeadingSensor = true;
+                updateCompassVisuals();
+            }
+        }
+
+        function updateCompassVisuals() {
+            const dial = document.getElementById('compass-dial');
+            const needle = document.getElementById('compass-needle');
+
+            if (dial && needle) {
+                // Rotate dial so North points to actual physical North based on phone orientation
+                dial.style.transform = `rotate(${-deviceHeading}deg)`;
+                
+                // Rotate needle to wind direction minus device heading so vector remains true in real space
+                const netWindRotation = stationData.windDir - deviceHeading;
+                needle.style.transform = `rotate(${netWindRotation}deg)`;
+            }
+        }
+
+        function updateClock() {
+            const now = new Date();
+            const h = String(now.getHours()).padStart(2, '0');
+            const m = String(now.getMinutes()).padStart(2, '0');
+            document.getElementById('status-clock').textContent = `${h}:${m}`;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        function getCardinalDirection(deg) {
+            const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+            const index = Math.round(((deg || 0) % 360) / 22.5);
+            return directions[index % 16];
+        }
+
+        function setStatusBanner(type, title, detail, codeText = "") {
+            const banner = document.getElementById('api-status-banner');
+            const titleEl = document.getElementById('api-status-title');
+            const detailEl = document.getElementById('api-status-detail');
+            const codeEl = document.getElementById('api-status-code');
+
+            banner.className = "rounded-2xl p-3 text-xs border transition-all space-y-1 shadow-md ";
+
+            if (type === 'success') {
+                banner.classList.add('bg-emerald-950/80', 'border-emerald-700/60', 'text-emerald-200');
+            } else if (type === 'error') {
+                banner.classList.add('bg-rose-950/80', 'border-rose-700/60', 'text-rose-200');
+            } else {
+                banner.classList.add('bg-amber-950/80', 'border-amber-700/60', 'text-amber-200');
+            }
+
+            titleEl.innerHTML = `<i data-lucide="${type === 'success' ? 'check-circle' : type === 'error' ? 'alert-circle' : 'radio'}" class="w-4 h-4"></i> ${title}`;
+            detailEl.textContent = detail;
+            codeEl.textContent = codeText;
+            lucide.createIcons();
+        }
+
+        // Robust Fetch Wrapper supporting Fallback CORS Proxies
+        async function fetchWithProxyFallback(targetUrl) {
+            const proxies = [
+                (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+                (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+                (url) => `https://thingproxy.freeboard.io/fetch/${url}`,
+                (url) => url // Direct Fetch fallback
+            ];
+
+            let lastError = null;
+
+            for (let i = 0; i < proxies.length; i++) {
+                try {
+                    const proxiedUrl = proxies[i](targetUrl);
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 7000);
+
+                    const res = await fetch(proxiedUrl, { 
+                        signal: controller.signal,
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    clearTimeout(timeoutId);
+
+                    if (res.ok) {
+                        const data = await res.json();
+                        return { data, proxyIndex: i };
+                    } else {
+                        lastError = new Error(`HTTP Status ${res.status}`);
+                    }
+                } catch (err) {
+                    lastError = err;
+                    // Silently try next proxy gateway
+                }
+            }
+            throw lastError || new Error("All proxy gateways failed or were blocked by CORS.");
+        }
+
+        // Fetch Primary Devices + Historical Telemetry
+        async function fetchWeatherData() {
+            const refreshIcon = document.getElementById('refresh-icon');
+            if (refreshIcon) refreshIcon.classList.add('animate-spin');
+
+            const appKey = config.appKey.trim();
+            const apiKey = config.userKey.trim();
+
+            if (!config.useDemo && appKey && apiKey) {
+                try {
+                    setStatusBanner('info', 'Connecting to Station', 'Querying api.ambientweather.net/v1/devices...', 'FETCHING');
+                    
+                    const targetDevicesUrl = `https://api.ambientweather.net/v1/devices?applicationKey=${appKey}&apiKey=${apiKey}`;
+                    const { data: devices, proxyIndex } = await fetchWithProxyFallback(targetDevicesUrl);
+
+                    if (Array.isArray(devices) && devices.length > 0) {
+                        const dev = devices[0];
+                        const lastData = dev.lastData || {};
+                        
+                        stationData = {
+                            temp: lastData.tempf ?? lastData.tempinf ?? null,
+                            feelsLike: lastData.feelsLike ?? lastData.feelsLikein ?? lastData.tempf ?? null,
+                            tempMax: lastData.maxdailytempf ?? lastData.tempf ?? null,
+                            tempMin: lastData.mindailytempf ?? lastData.tempf ?? null,
+                            windDir: lastData.winddir ?? 0,
+                            windSpeed: lastData.windspeedmph ?? 0,
+                            windGust: lastData.windgustmph ?? lastData.windspeedmph ?? 0,
+                            humidity: lastData.humidity ?? lastData.humidityin ?? null,
+                            baro: lastData.baromrelin ?? lastData.baromabsin ?? null,
+                            uv: lastData.uv ?? 0,
+                            solar: lastData.solarradiation ?? null,
+                            rain: lastData.dailyrainin ?? lastData.eventrainin ?? 0,
+                            mac: dev.macAddress || null,
+                            name: dev.info?.name || "Ambient Station",
+                            lastUpdated: new Date(lastData.date || Date.now())
+                        };
+
+                        // Optional: Try fetching historical trend if MAC is available
+                        if (stationData.mac) {
+                            try {
+                                const deviceHistoryUrl = `https://api.ambientweather.net/v1/devices/${stationData.mac}?applicationKey=${appKey}&apiKey=${apiKey}&limit=24`;
+                                const historyRes = await fetchWithProxyFallback(deviceHistoryUrl);
+                                if (Array.isArray(historyRes.data)) {
+                                    historicalTrend = historyRes.data;
+                                }
+                            } catch (e) {
+                                console.warn("Could not fetch historical device data:", e);
+                            }
+                        }
+
+                        updateBadge(false);
+                        const gatewayMethod = proxyIndex === 3 ? "Direct Fetch" : `Proxy Gate ${proxyIndex + 1}`;
+                        setStatusBanner('success', `Station Online: ${stationData.name}`, `Live telemetry fetched successfully (${gatewayMethod}).`, 'HTTP 200');
+                    } else {
+                        throw new Error("No weather devices found for these API keys.");
+                    }
+                } catch (err) {
+                    const errorMsg = err?.message || "CORS or Network Fetch Error";
+                    updateBadge(true, "DEMO / OFFLINE");
+                    setStatusBanner('error', 'Live API Fetch Interrupted', `${errorMsg}. Displaying simulated telemetry.`, 'CORS/NETWORK');
+                    simulateLiveSample();
+                }
+            } else {
+                updateBadge(true, "DEMO MODE");
+                setStatusBanner('warning', 'Demo Mode Active', 'Using simulated station telemetry.', 'DEMO');
+                simulateLiveSample();
+            }
+
+            renderDashboard();
+            if (refreshIcon) setTimeout(() => refreshIcon.classList.remove('animate-spin'), 600);
+        }
+
+        function simulateLiveSample() {
+            const variation = (Math.random() - 0.5) * 1.5;
+            stationData = {
+                temp: parseFloat((72.4 + variation).toFixed(1)),
+                feelsLike: parseFloat((71.0 + variation).toFixed(1)),
+                tempMax: 76.2,
+                tempMin: 62.1,
+                windDir: Math.floor((330 + (Math.random() - 0.5) * 20) % 360),
+                windSpeed: parseFloat((8.5 + (Math.random() - 0.5) * 2).toFixed(1)),
+                windGust: parseFloat((14.2 + (Math.random() - 0.5) * 3).toFixed(1)),
+                humidity: 58,
+                baro: 29.92,
+                uv: 5,
+                solar: 450,
+                rain: 0.00,
+                mac: "00:0E:C6:XX:XX:XX",
+                name: "Home Weather Station",
+                lastUpdated: new Date()
+            };
+        }
+
+        function updateBadge(isDemo, customText = null) {
+            const badge = document.getElementById('connection-badge');
+            if (isDemo) {
+                badge.textContent = customText || "DEMO MODE";
+                badge.className = "px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30";
+            } else {
+                badge.textContent = "STATION ONLINE";
+                badge.className = "px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+            }
+        }
+
+        function renderDashboard() {
+            let tempDisplay = stationData.temp;
+            let feelsDisplay = stationData.feelsLike;
+            let maxDisplay = stationData.tempMax;
+            let minDisplay = stationData.tempMin;
+
+            if (tempDisplay !== null && config.tempUnit === 'C') {
+                tempDisplay = (tempDisplay - 32) * 5 / 9;
+                if (feelsDisplay !== null) feelsDisplay = (feelsDisplay - 32) * 5 / 9;
+                if (maxDisplay !== null) maxDisplay = (maxDisplay - 32) * 5 / 9;
+                if (minDisplay !== null) minDisplay = (minDisplay - 32) * 5 / 9;
+            }
+
+            document.getElementById('current-temp').textContent = tempDisplay !== null ? tempDisplay.toFixed(0) : '--';
+            document.getElementById('feels-like').textContent = feelsDisplay !== null ? `${feelsDisplay.toFixed(0)}°` : '--';
+            document.getElementById('temp-max').textContent = maxDisplay !== null ? `${maxDisplay.toFixed(0)}°` : '--';
+            document.getElementById('temp-min').textContent = minDisplay !== null ? `${minDisplay.toFixed(0)}°` : '--';
+
+            let speedDisplay = stationData.windSpeed;
+            let gustDisplay = stationData.windGust;
+            if (config.speedUnit === 'kmh') {
+                speedDisplay *= 1.60934;
+                gustDisplay *= 1.60934;
+            }
+
+            document.getElementById('wind-speed').textContent = speedDisplay.toFixed(1);
+            document.getElementById('wind-speed-alt').textContent = speedDisplay.toFixed(1);
+            document.getElementById('wind-gust').textContent = gustDisplay.toFixed(1);
+
+            const cardinal = getCardinalDirection(stationData.windDir);
+            document.getElementById('wind-dir-text').textContent = `${cardinal} (${stationData.windDir}°)`;
+            
+            // Trigger updated compass positioning taking device orientation into account
+            updateCompassVisuals();
+
+            document.getElementById('metric-humidity').textContent = stationData.humidity !== null ? `${stationData.humidity}%` : '--%';
+            document.getElementById('metric-baro').textContent = stationData.baro !== null ? `${stationData.baro} inHg` : '-- inHg';
+            document.getElementById('metric-uv').textContent = stationData.uv !== null ? `${stationData.uv} UV` : '-- UV';
+            document.getElementById('metric-solar').textContent = stationData.solar !== null ? `${stationData.solar} W/m²` : 'Solar Radiation N/A';
+            document.getElementById('metric-rain').textContent = stationData.rain !== null ? `${stationData.rain} in` : '-- in';
+
+            document.getElementById('station-name').textContent = stationData.name;
+            document.getElementById('last-updated').innerHTML = `
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                Updated ${stationData.lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            `;
+
+            renderForecast();
+        }
+
+        function renderForecast() {
+            const container = document.getElementById('forecast-hourly-container');
+            const nowHour = new Date().getHours();
+            
+            let html = '';
+            for (let i = 1; i <= 4; i++) {
+                const hourTime = (nowHour + i) % 24;
+                const formattedHour = hourTime === 0 ? '12 AM' : hourTime > 12 ? `${hourTime - 12} PM` : `${hourTime} AM`;
+                
+                const hourTempF = (stationData.temp || 70) + (i % 2 === 0 ? 1 : -1) * i;
+                const hourTemp = config.tempUnit === 'C' ? (hourTempF - 32) * 5 / 9 : hourTempF;
+                
+                const hourDir = (stationData.windDir + i * 15) % 360;
+                let hourSpeed = (stationData.windSpeed || 5) + (i % 2 === 0 ? 1.2 : -0.8);
+                if (config.speedUnit === 'kmh') hourSpeed *= 1.60934;
+
+                html += `
+                    <div class="bg-slate-900/80 border border-slate-700/50 rounded-2xl p-2.5 flex flex-col items-center justify-between space-y-2">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase">${formattedHour}</span>
+                        <div class="text-sm font-black text-white">${hourTemp.toFixed(0)}°</div>
+                        
+                        <div class="my-1 text-ambient-accent" style="transform: rotate(${hourDir}deg)">
+                            <i data-lucide="arrow-up" class="w-3.5 h-3.5"></i>
+                        </div>
+
+                        <div class="text-[10px] font-bold text-cyan-300 flex items-center">
+                            ${hourSpeed.toFixed(0)} <span class="text-[8px] ml-0.5 text-slate-400">${config.speedUnit}</span>
+                        </div>
+                    </div>
+                `;
+            }
+            container.innerHTML = html;
+            lucide.createIcons();
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('text-ambient-accent');
+                btn.classList.add('text-slate-400');
+            });
+            document.getElementById(`nav-${tabId}`).classList.add('text-ambient-accent');
+        }
+
+        function handleSaveKeys(e) {
+            e.preventDefault();
+            config.appKey = document.getElementById('input-app-key').value.trim();
+            config.userKey = document.getElementById('input-user-key').value.trim();
+            
+            localStorage.setItem('ambient_app_key', config.appKey);
+            localStorage.setItem('ambient_user_key', config.userKey);
+
+            config.useDemo = false;
+            localStorage.setItem('ambient_demo_mode', 'false');
+
+            showToast("Keys saved & synced");
+            fetchWeatherData();
+        }
+
+        function toggleDemoMode() {
+            config.useDemo = !config.useDemo;
+            localStorage.setItem('ambient_demo_mode', config.useDemo.toString());
+            showToast(config.useDemo ? "Demo Simulation Active" : "Fetching Live API");
+            fetchWeatherData();
+        }
+
+        function setTempUnit(unit) {
+            config.tempUnit = unit;
+            localStorage.setItem('ambient_temp_unit', unit);
+            document.querySelectorAll('.unit-temp').forEach(e => e.textContent = `°${unit}`);
+            
+            document.getElementById('unit-f').className = `px-3 py-1 rounded-lg text-xs font-bold ${unit === 'F' ? 'bg-ambient-500 text-white' : 'text-slate-400'}`;
+            document.getElementById('unit-c').className = `px-3 py-1 rounded-lg text-xs font-bold ${unit === 'C' ? 'bg-ambient-500 text-white' : 'text-slate-400'}`;
+            renderDashboard();
+        }
+
+        function setSpeedUnit(unit) {
+            config.speedUnit = unit;
+            localStorage.setItem('ambient_speed_unit', unit);
+            document.querySelectorAll('.unit-speed').forEach(e => e.textContent = unit);
+
+            document.getElementById('unit-mph').className = `px-3 py-1 rounded-lg text-xs font-bold ${unit === 'mph' ? 'bg-ambient-500 text-white' : 'text-slate-400'}`;
+            document.getElementById('unit-kmh').className = `px-3 py-1 rounded-lg text-xs font-bold ${unit === 'kmh' ? 'bg-ambient-500 text-white' : 'text-slate-400'}`;
+            renderDashboard();
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-message').textContent = msg;
+            toast.classList.remove('hidden', '-translate-y-5', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('-translate-y-5', 'opacity-0');
+                setTimeout(() => toast.classList.add('hidden'), 300);
+            }, 2500);
+        }
+
+        window.onload = function() {
+            // Guarantee fresh storage sync with provided keys
+            localStorage.setItem('ambient_app_key', config.appKey);
+            localStorage.setItem('ambient_user_key', config.userKey);
+
+            document.getElementById('input-app-key').value = config.appKey;
+            document.getElementById('input-user-key').value = config.userKey;
+            
+            setTempUnit(config.tempUnit);
+            setSpeedUnit(config.speedUnit);
+
+            initCompassSensor();
+
+            fetchWeatherData();
+            setInterval(fetchWeatherData, 60000);
+            lucide.createIcons();
+        };
+    </script>
+</body>
+</html>
