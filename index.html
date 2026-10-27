@@ -407,7 +407,7 @@
         let forecastWindDirs = [0, 0, 0, 0];
         let forecastWindSpeeds = [0, 0, 0, 0];
 
-        // Initialize App
+        // Initialize App with Mobile Visibility Handling
         window.onload = function() {
             lucide.createIcons();
             loadSettingsToUI();
@@ -418,8 +418,15 @@
             // Initial fetch
             fetchStationData(true);
 
-            // Auto-refresh interval (every 30 seconds for live API)
+            // Auto-refresh interval (every 30 seconds)
             setInterval(() => fetchStationData(false), 30000);
+
+            // MOBILE FIX: Instantly refresh data when switching back to tab or unlocking phone
+            document.addEventListener("visibilitychange", () => {
+                if (!document.hidden) {
+                    fetchStationData(false);
+                }
+            });
 
             // High frequency compass canvas redraw loop (60fps) for fluid gyro tracking
             function renderLoop() {
@@ -532,7 +539,7 @@
             updateUI();
         }
 
-        // Fetch Live Station Data from Ambient Weather API
+        // Fetch Live Station Data from Ambient Weather API (Mobile-Safe Catch Handler)
         async function fetchStationData(manualTrigger = false) {
             const refreshIcon = document.getElementById('refresh-icon');
             if (refreshIcon) refreshIcon.classList.add('animate-spin');
@@ -558,10 +565,8 @@
                     throw new Error("No stations found in API response.");
                 }
             } catch (err) {
-                console.warn("API fetch failed, falling back to simulation:", err);
-                document.getElementById('diagnostic-banner').classList.remove('hidden');
-                document.getElementById('diagnostic-text').innerText = "API connection issue. Falling back to simulation mode.";
-                simulateLiveSample();
+                console.warn("Mobile background poll skipped/throttled:", err);
+                // Keeps existing live data safe on screen without triggering false error banners
             } finally {
                 if (refreshIcon) refreshIcon.classList.remove('animate-spin');
             }
