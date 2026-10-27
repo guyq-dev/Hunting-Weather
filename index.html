@@ -539,10 +539,12 @@
             updateUI();
         }
 
-        // Fetch Live Station Data from Ambient Weather API (Mobile-Safe Catch Handler)
+        // Fetch Live Station Data from Ambient Weather API (with robust mobile fallback)
         async function fetchStationData(manualTrigger = false) {
             const refreshIcon = document.getElementById('refresh-icon');
             if (refreshIcon) refreshIcon.classList.add('animate-spin');
+
+            document.getElementById('last-updated').innerText = "Syncing...";
 
             if (config.demoMode) {
                 simulateLiveSample();
@@ -565,8 +567,10 @@
                     throw new Error("No stations found in API response.");
                 }
             } catch (err) {
-                console.warn("Mobile background poll skipped/throttled:", err);
-                // Keeps existing live data safe on screen without triggering false error banners
+                console.warn("API fetch failed or blocked. Falling back to simulation:", err);
+                simulateLiveSample();
+                document.getElementById('diagnostic-banner').classList.remove('hidden');
+                document.getElementById('diagnostic-text').innerText = "API blocked or offline. Running simulation fallback.";
             } finally {
                 if (refreshIcon) refreshIcon.classList.remove('animate-spin');
             }
