@@ -5,13 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Querner Family Farm Weather</title>
     
-    <!-- PWA Meta Tags & Manifest Reference -->
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#090d16">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Farm Weather">
-
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -42,7 +35,6 @@
             -webkit-tap-highlight-color: transparent;
         }
 
-        /* Glassmorphism utility */
         .glass-panel {
             background: rgba(18, 24, 38, 0.75);
             backdrop-filter: blur(12px);
@@ -57,7 +49,6 @@
             border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
-        /* Tab displaying and animation */
         .tab-content {
             display: none;
             opacity: 0;
@@ -68,22 +59,21 @@
             opacity: 1;
         }
 
-        /* Touch interaction handling for interactive canvas */
         canvas {
             touch-action: none;
         }
 
-        /* Flash pulse animation when live data syncs */
-        @keyframes updateFlash {
-            0% { transform: scale(1); background-color: rgba(52, 211, 153, 1); }
-            50% { transform: scale(1.4); background-color: rgba(56, 189, 248, 1); box-shadow: 0 0 12px #38bdf8; }
-            100% { transform: scale(1); background-color: rgba(52, 211, 153, 1); }
+        /* Exactly 1-second green blink on update */
+        @keyframes blinkGreen {
+            0% { background-color: #000000; box-shadow: 0 0 0 rgba(34, 197, 94, 0); }
+            30% { background-color: #22c55e; box-shadow: 0 0 10px #22c55e; }
+            70% { background-color: #22c55e; box-shadow: 0 0 10px #22c55e; }
+            100% { background-color: #000000; box-shadow: 0 0 0 rgba(34, 197, 94, 0); }
         }
-        .flash-update {
-            animation: updateFlash 0.8s ease-in-out;
+        .blink-update {
+            animation: blinkGreen 1s ease-in-out forwards;
         }
 
-        /* Custom mini scrollbars */
         ::-webkit-scrollbar {
             width: 4px;
             height: 4px;
@@ -99,32 +89,29 @@
 </head>
 <body class="h-[100dvh] w-full overflow-hidden flex flex-col bg-slate-950 text-slate-100 antialiased selection:bg-sky-500 selection:text-white" onclick="initSensorsOnce()">
 
-    <!-- Top Header Bar -->
+    <!-- Header / Top Bar -->
     <header class="w-full h-14 bg-slate-900/80 border-b border-slate-800 flex items-center justify-between px-4 z-20 shrink-0">
         <div class="flex items-center space-x-2.5">
             <div class="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400">
                 <i data-lucide="wind" class="w-5 h-5"></i>
             </div>
             <div>
-                <h1 class="text-xs sm:text-sm font-bold text-white tracking-wide uppercase leading-tight" id="station-title">Querner Family Farm Weather</h1>
+                <h1 class="text-xs sm:text-sm font-bold text-white tracking-wide uppercase leading-tight">Querner Family Farm Weather</h1>
                 <div class="flex items-center space-x-1.5">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400" id="status-dot"></span>
                     <span class="text-[10px] font-medium text-slate-400" id="last-updated">Connecting...</span>
                 </div>
             </div>
         </div>
 
+        <!-- Upper Right Status Dot (Normally black, blinks green for 1s on update) -->
         <div class="flex items-center space-x-2">
-            <button id="refresh-btn" onclick="fetchStationData(true)" class="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 active:scale-95 transition text-slate-300 border border-slate-700/50" title="Refresh Data">
-                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-            </button>
+            <div id="status-dot-top" class="w-3.5 h-3.5 rounded-full bg-black border border-slate-700 transition-colors" title="Data Sync Status"></div>
         </div>
     </header>
 
-    <!-- Main Content Container -->
+    <!-- App Body Main Content -->
     <main class="flex-1 w-full relative overflow-hidden flex flex-col">
 
-        <!-- Diagnostic Alert Banner -->
         <div id="diagnostic-banner" class="hidden w-full bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-xs text-amber-300 flex items-center justify-between shrink-0">
             <div class="flex items-center space-x-2">
                 <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400 shrink-0"></i>
@@ -138,7 +125,7 @@
         <!-- TAB 1: Live Gauge Dashboard -->
         <section id="tab-dashboard" class="tab-content active flex-1 flex-col overflow-y-auto p-4 space-y-4">
             
-            <!-- GYRO COMPASS & WIND VECTOR SECTION -->
+            <!-- BALANCED COMPASS & WIND SECTION -->
             <div class="glass-panel rounded-3xl p-4 flex flex-col items-center justify-center relative overflow-hidden">
                 <div class="w-full flex items-center justify-between mb-2">
                     <div class="flex items-center space-x-2">
@@ -191,7 +178,7 @@
                 <div id="forecast-hourly-container" class="grid grid-cols-4 gap-2"></div>
             </div>
 
-            <!-- OUTDOOR TEMP BANNER CARD (AT BOTTOM) -->
+            <!-- Outdoor Temp Banner Card (At Bottom) -->
             <div class="glass-panel rounded-2xl p-4 flex items-center justify-between relative overflow-hidden">
                 <div class="flex flex-col">
                     <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Outdoor Temp</span>
@@ -223,12 +210,12 @@
 
         </section>
 
-        <!-- TAB 2: Tactical Radar Map View -->
-        <section id="tab-map" class="tab-content flex-1 flex-col p-4 space-y-3 overflow-hidden h-full">
+        <!-- TAB 2: Tactical Radar Map View + Satellite Image -->
+        <section id="tab-map" class="tab-content flex-1 flex-col p-4 space-y-3 overflow-y-auto">
             <div class="w-full flex items-center justify-between shrink-0">
                 <div class="flex items-center space-x-2">
                     <i data-lucide="map" class="w-4 h-4 text-sky-400"></i>
-                    <h2 class="text-xs font-bold text-white uppercase tracking-wider">Tactical Wind Radar Overlay</h2>
+                    <h2 class="text-xs font-bold text-white uppercase tracking-wider">Tactical Wind Radar & Satellite</h2>
                 </div>
                 <div class="flex items-center space-x-2">
                     <span id="map-wind-badge" class="text-[10px] font-semibold text-sky-300 bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 rounded-full flex items-center">
@@ -237,9 +224,22 @@
                 </div>
             </div>
 
-            <!-- Canvas wrapper configured for robust flex layout calculation -->
-            <div class="flex-1 w-full min-h-[280px] rounded-2xl overflow-hidden border border-slate-800 relative bg-slate-950 flex items-center justify-center shrink-0" id="tactical-wrapper">
-                <canvas id="tacticalMapCanvas" class="w-full h-full block absolute inset-0"></canvas>
+            <!-- Tactical Canvas Radar Overlay -->
+            <div class="w-full h-64 rounded-2xl overflow-hidden border border-slate-800 relative bg-slate-950 flex items-center justify-center shrink-0" id="tactical-wrapper">
+                <canvas id="tacticalMapCanvas" class="w-full h-full block"></canvas>
+            </div>
+
+            <!-- Satellite Map Card -->
+            <div class="glass-panel rounded-2xl p-3 flex flex-col space-y-2 shrink-0">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center">
+                        <i data-lucide="globe" class="w-3.5 h-3.5 mr-1.5 text-sky-400"></i> Farm Aerial Satellite Map
+                    </span>
+                    <span class="text-[10px] text-slate-400">New Hampton, NY</span>
+                </div>
+                <div class="w-full h-44 rounded-xl overflow-hidden border border-slate-800 relative">
+                    <img src="https://cdn.landsearch.com/listings/4WyHp/small/middletown-ny-179461668.jpg" alt="Farm Satellite Aerial View" class="w-full h-full object-cover">
+                </div>
             </div>
         </section>
 
@@ -329,7 +329,7 @@
         </button>
     </nav>
 
-    <!-- Application Script Logic -->
+    <!-- App Logic -->
     <script>
         let config = {
             tempUnit: localStorage.getItem('ambient_unit_temp') || 'f',
@@ -366,7 +366,6 @@
         window.onload = function() {
             lucide.createIcons();
             loadSettingsToUI();
-            
             initCompassCanvas();
             initTacticalMapCanvas();
 
@@ -385,7 +384,6 @@
 
             setupResizeObservers();
 
-            // Unified 60fps render loop
             function renderLoop() {
                 drawCompass();
                 drawTacticalMap();
@@ -404,11 +402,6 @@
             if (tacticalWrap && window.ResizeObserver) {
                 new ResizeObserver(() => resizeTacticalMapCanvas()).observe(tacticalWrap);
             }
-
-            window.addEventListener('resize', () => {
-                resizeCompassCanvas();
-                resizeTacticalMapCanvas();
-            });
         }
 
         function initSensorsOnce() {
@@ -453,26 +446,15 @@
                 el.classList.add('text-slate-400');
             });
 
-            const activeTab = document.getElementById(`tab-${tabId}`);
-            if (activeTab) activeTab.classList.add('active');
-
+            document.getElementById(`tab-${tabId}`).classList.add('active');
             const activeBtn = document.getElementById(`nav-btn-${tabId}`);
             if (activeBtn) {
                 activeBtn.classList.remove('text-slate-400');
                 activeBtn.classList.add('text-sky-400');
             }
 
-            // Immediately force recalculation of tactical map dimensions upon tab switch
             if (tabId === 'map') {
-                setTimeout(() => {
-                    resizeTacticalMapCanvas();
-                    drawTacticalMap();
-                }, 30);
-            } else if (tabId === 'dashboard') {
-                setTimeout(() => {
-                    resizeCompassCanvas();
-                    drawCompass();
-                }, 30);
+                setTimeout(() => resizeTacticalMapCanvas(), 50);
             }
         }
 
@@ -510,12 +492,13 @@
             }
         }
 
+        // Trigger exact 1-second green blink on the status dot in top right
         function triggerUpdateFlash() {
-            const dot = document.getElementById('status-dot');
+            const dot = document.getElementById('status-dot-top');
             if (dot) {
-                dot.classList.remove('flash-update');
-                void dot.offsetWidth;
-                dot.classList.add('flash-update');
+                dot.classList.remove('blink-update');
+                void dot.offsetWidth; // force reflow
+                dot.classList.add('blink-update');
             }
         }
 
@@ -584,7 +567,7 @@
                 feelsLike: 55.9,
                 tempMax: stationData.tempMax || 62.0,
                 tempMin: stationData.tempMin || 50.1,
-                windDir: 132,
+                windDir: (stationData.windDir + 5) % 360,
                 windSpeed: 4.2,
                 windGust: 7.8,
                 humidity: 53,
@@ -599,7 +582,6 @@
         }
 
         function updateUI() {
-            document.getElementById('station-title').innerText = stationData.name;
             document.getElementById('last-updated').innerText = stationData.lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
             let displayTemp = stationData.temp;
@@ -671,8 +653,8 @@
                 html += `
                     <div class="glass-card rounded-xl p-2 flex flex-col items-center justify-center text-center">
                         <span class="text-[10px] font-bold text-slate-400 mb-1">${timeStr}</span>
-                        <div class="w-6 h-6 rounded-full bg-sky-500/10 border border-sky-500/30 flex items-center justify-center my-1 text-sky-400 transform" style="transform: rotate(${dir}deg);">
-                            <i data-lucide="arrow-up" class="w-3.5 h-3.5"></i>
+                        <div class="w-6 h-6 rounded-full bg-sky-500/10 border border-sky-500/30 flex items-center justify-center my-1 text-sky-400 transform transition-transform duration-500" style="transform: rotate(${dir}deg);">
+                            <i data-lucide="navigation" class="w-3.5 h-3.5 text-sky-400 fill-sky-400"></i>
                         </div>
                         <span class="text-xs font-extrabold text-white">${projSpeed.toFixed(1)}</span>
                         <span class="text-[9px] text-sky-400 font-semibold">${cardinal}</span>
@@ -718,7 +700,6 @@
             return directions[Math.round((angle % 360) / 22.5) % 16];
         }
 
-        // --- DASHBOARD COMPASS CANVAS ENGINE ---
         let compassCanvas, compassCtx;
 
         function initCompassCanvas() {
@@ -735,7 +716,7 @@
             const size = Math.max(parent.clientWidth, 150);
             compassCanvas.width = size * window.devicePixelRatio;
             compassCanvas.height = size * window.devicePixelRatio;
-            if (compassCtx) compassCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            compassCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
         }
 
         function drawCompass() {
@@ -790,32 +771,41 @@
             }
             compassCtx.restore();
 
+            // Traditional Compass Needle Style
             const windRad = (stationData.windDir - 90 - (gyroActive ? phoneHeading : 0)) * (Math.PI / 180);
-            const arrowLen = radius - 35;
-            const ax = centerX + arrowLen * Math.cos(windRad);
-            const ay = centerY + arrowLen * Math.sin(windRad);
-
-            compassCtx.beginPath();
-            compassCtx.moveTo(centerX, centerY);
-            compassCtx.lineTo(ax, ay);
-            compassCtx.strokeStyle = '#f97316';
-            compassCtx.lineWidth = 3;
-            compassCtx.stroke();
+            const needleLen = radius - 30;
 
             compassCtx.save();
-            compassCtx.translate(ax, ay);
-            compassCtx.rotate(windRad + Math.PI / 2);
+            compassCtx.translate(centerX, centerY);
+            compassCtx.rotate(windRad);
+
+            // North Arrow Head (Orange)
             compassCtx.beginPath();
-            compassCtx.moveTo(0, 0);
-            compassCtx.lineTo(-5, -10);
-            compassCtx.lineTo(5, -10);
+            compassCtx.moveTo(0, -needleLen);
+            compassCtx.lineTo(-7, 0);
+            compassCtx.lineTo(7, 0);
             compassCtx.closePath();
             compassCtx.fillStyle = '#f97316';
             compassCtx.fill();
+
+            // South Tail (Slate)
+            compassCtx.beginPath();
+            compassCtx.moveTo(0, needleLen * 0.7);
+            compassCtx.lineTo(-6, 0);
+            compassCtx.lineTo(6, 0);
+            compassCtx.closePath();
+            compassCtx.fillStyle = '#64748b';
+            compassCtx.fill();
+
+            // Center Pin
+            compassCtx.beginPath();
+            compassCtx.arc(0, 0, 4, 0, 2 * Math.PI);
+            compassCtx.fillStyle = '#ffffff';
+            compassCtx.fill();
+
             compassCtx.restore();
         }
 
-        // --- TAB 2: TACTICAL RADAR MAP CANVAS ENGINE ---
         let tacticalCanvas, tacticalCtx;
 
         function initTacticalMapCanvas() {
@@ -829,28 +819,17 @@
             if (!tacticalCanvas) return;
             const parent = tacticalCanvas.parentElement;
             if (!parent) return;
-
-            // Compute actual bounding box width and height
-            const width = parent.clientWidth || parent.getBoundingClientRect().width || 300;
-            const height = parent.clientHeight || parent.getBoundingClientRect().height || 300;
-
-            if (width > 0 && height > 0) {
-                tacticalCanvas.width = width * window.devicePixelRatio;
-                tacticalCanvas.height = height * window.devicePixelRatio;
-                if (tacticalCtx) {
-                    tacticalCtx.resetTransform();
-                    tacticalCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
-                }
-            }
+            const width = Math.max(parent.clientWidth, 200);
+            const height = Math.max(parent.clientHeight, 200);
+            tacticalCanvas.width = width * window.devicePixelRatio;
+            tacticalCanvas.height = height * window.devicePixelRatio;
+            tacticalCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
         }
 
         function drawTacticalMap() {
             if (!tacticalCtx || !tacticalCanvas) return;
-
-            const parent = tacticalCanvas.parentElement;
-            const width = tacticalCanvas.clientWidth || (parent ? parent.clientWidth : 0);
-            const height = tacticalCanvas.clientHeight || (parent ? parent.clientHeight : 0);
-
+            const width = tacticalCanvas.clientWidth;
+            const height = tacticalCanvas.clientHeight;
             if (!width || !height) return;
 
             const centerX = width / 2;
@@ -858,101 +837,73 @@
 
             tacticalCtx.clearRect(0, 0, width, height);
 
-            // 1. Tactical Grid Background
             tacticalCtx.fillStyle = '#090d16';
             tacticalCtx.fillRect(0, 0, width, height);
 
-            // 2. Tactical Concentric Range Rings & Labels
             const maxR = Math.max(Math.min(centerX, centerY) - 30, 40);
-            const step = maxR / 4;
-
-            for (let i = 1; i <= 4; i++) {
-                const r = step * i;
+            for (let r = 40; r <= maxR; r += 40) {
                 tacticalCtx.beginPath();
                 tacticalCtx.arc(centerX, centerY, r, 0, 2 * Math.PI);
-                tacticalCtx.strokeStyle = i === 4 ? 'rgba(56, 189, 248, 0.25)' : 'rgba(56, 189, 248, 0.1)';
-                tacticalCtx.lineWidth = i === 4 ? 1.5 : 1;
+                tacticalCtx.strokeStyle = 'rgba(56, 189, 248, 0.1)';
+                tacticalCtx.lineWidth = 1;
                 tacticalCtx.stroke();
             }
 
-            // 3. Crosshairs & Outer Cardinal Markings
             tacticalCtx.beginPath();
-            tacticalCtx.moveTo(centerX, 20); tacticalCtx.lineTo(centerX, height - 20);
-            tacticalCtx.moveTo(20, centerY); tacticalCtx.lineTo(width - 20, centerY);
+            tacticalCtx.moveTo(centerX, 15); tacticalCtx.lineTo(centerX, height - 15);
+            tacticalCtx.moveTo(15, centerY); tacticalCtx.lineTo(width - 15, centerY);
             tacticalCtx.strokeStyle = 'rgba(56, 189, 248, 0.15)';
             tacticalCtx.lineWidth = 1;
             tacticalCtx.stroke();
 
-            // Cardinal Letters
-            tacticalCtx.font = 'bold 10px Inter, sans-serif';
-            tacticalCtx.fillStyle = '#38bdf8';
-            tacticalCtx.textAlign = 'center';
-            tacticalCtx.textBaseline = 'middle';
-            tacticalCtx.fillText('N', centerX, 12);
-            tacticalCtx.fillText('S', centerX, height - 12);
-            tacticalCtx.fillText('W', 12, centerY);
-            tacticalCtx.fillText('E', width - 12, centerY);
-
-            // 4. Dynamic Wind Cone & Arrow Vector
             const windRad = (stationData.windDir - 90) * (Math.PI / 180);
-            const streamLen = Math.max(maxR - 10, 30);
+            const streamLen = Math.max(maxR - 20, 20);
 
             tacticalCtx.save();
             tacticalCtx.translate(centerX, centerY);
             tacticalCtx.rotate(windRad);
 
-            // Glowing intensity plume/cone
             const gradient = tacticalCtx.createLinearGradient(0, 0, 0, -streamLen);
-            gradient.addColorStop(0, 'rgba(249, 115, 22, 0.45)');
-            gradient.addColorStop(0.7, 'rgba(249, 115, 22, 0.15)');
-            gradient.addColorStop(1, 'rgba(56, 189, 248, 0.0)');
+            gradient.addColorStop(0, 'rgba(249, 115, 22, 0.4)');
+            gradient.addColorStop(1, 'rgba(56, 189, 248, 0.05)');
 
             tacticalCtx.beginPath();
             tacticalCtx.moveTo(0, 0);
-            tacticalCtx.lineTo(-24, -streamLen);
-            tacticalCtx.lineTo(24, -streamLen);
+            tacticalCtx.lineTo(-20, -streamLen);
+            tacticalCtx.lineTo(20, -streamLen);
             tacticalCtx.closePath();
             tacticalCtx.fillStyle = gradient;
             tacticalCtx.fill();
 
-            // Main wind vector shaft
             tacticalCtx.beginPath();
             tacticalCtx.moveTo(0, 0);
             tacticalCtx.lineTo(0, -streamLen);
             tacticalCtx.strokeStyle = '#f97316';
-            tacticalCtx.lineWidth = 3.5;
+            tacticalCtx.lineWidth = 4;
             tacticalCtx.stroke();
 
-            // Arrowhead
             tacticalCtx.beginPath();
             tacticalCtx.moveTo(0, -streamLen);
-            tacticalCtx.lineTo(-8, -streamLen + 14);
-            tacticalCtx.lineTo(8, -streamLen + 14);
+            tacticalCtx.lineTo(-7, -streamLen + 12);
+            tacticalCtx.lineTo(7, -streamLen + 12);
             tacticalCtx.closePath();
             tacticalCtx.fillStyle = '#f97316';
             tacticalCtx.fill();
 
             tacticalCtx.restore();
 
-            // 5. Central Farm Marker Pin
             tacticalCtx.beginPath();
             tacticalCtx.arc(centerX, centerY, 7, 0, 2 * Math.PI);
             tacticalCtx.fillStyle = '#38bdf8';
             tacticalCtx.fill();
-            tacticalCtx.lineWidth = 2.5;
+            tacticalCtx.lineWidth = 2;
             tacticalCtx.strokeStyle = '#ffffff';
             tacticalCtx.stroke();
 
-            // 6. Farm Station & Telemetry Label Overlay
-            tacticalCtx.font = 'extrabold 11px Inter, sans-serif';
+            tacticalCtx.font = 'bold 10px Inter, sans-serif';
             tacticalCtx.fillStyle = '#ffffff';
             tacticalCtx.textAlign = 'center';
-            tacticalCtx.fillText("QUERNER FAMILY FARM", centerX, centerY + 24);
-
-            const cardinalStr = getCardinalDirection(stationData.windDir);
-            tacticalCtx.font = '600 10px Inter, sans-serif';
-            tacticalCtx.fillStyle = '#38bdf8';
-            tacticalCtx.fillText(`${Math.round(stationData.windDir)}° ${cardinalStr} • ${stationData.windSpeed} MPH`, centerX, centerY + 38);
+            tacticalCtx.fillText("FARM CENTER", centerX, centerY + 22);
         }
     </script>
 </body>
