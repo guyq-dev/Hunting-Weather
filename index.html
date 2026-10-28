@@ -465,8 +465,8 @@
             }
 
             const cardinal = getCardinalDirection(stationData.windDir);
-            // Rotated 180 deg (+180) so the arrow points from the origin of the wind (e.g. SSE points from 5 o'clock)
-            const arrowRotation = stationData.windDir + 180;
+            // Points to direction wind is blowing TOWARDS (origin + 180 deg)
+            const arrowRotation = (stationData.windDir + 180) % 360;
             
             const windArrowIcon = L.divIcon({
                 className: 'custom-wind-overlay',
@@ -771,8 +771,8 @@
                 else if (config.speedUnit === 'kts') projSpeed *= 0.868976;
 
                 const cardinal = getCardinalDirection(item.windDir);
-                // Rotate forecast arrows 180 deg so they also point from the origin of the wind
-                const forecastArrowRot = item.windDir + 180;
+                // Points towards target direction (origin + 180 deg)
+                const forecastArrowRot = (item.windDir + 180) % 360;
 
                 html += `
                     <div class="glass-card rounded-xl p-2 flex flex-col items-center justify-center text-center">
@@ -897,8 +897,8 @@
             }
             compassCtx.restore();
 
-            // Corrected Wind Direction Vector Needle (+ 180 deg so it points from wind origin)
-            let rotationAngle = stationData.windDir + 180;
+            // Wind vector needle points toward wind destination (windDir + 180 deg)
+            let rotationAngle = (stationData.windDir + 180) % 360;
             if (compassMode === 'gyro' && gyroActive) {
                 rotationAngle -= phoneHeading;
             }
