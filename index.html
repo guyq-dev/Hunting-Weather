@@ -465,7 +465,7 @@
             }
 
             const cardinal = getCardinalDirection(stationData.windDir);
-            // Points to direction wind is blowing TOWARDS (origin + 180 deg)
+            // Rotated 180° so the arrow points in the direction the wind is traveling TOWARD
             const arrowRotation = (stationData.windDir + 180) % 360;
             
             const windArrowIcon = L.divIcon({
@@ -897,12 +897,15 @@
             }
             compassCtx.restore();
 
-            // Wind vector needle points toward wind destination (windDir + 180 deg)
-            let rotationAngle = (stationData.windDir + 180) % 360;
+            // Corrected Canvas Rotation Math:
+            // Standard 0 deg points straight UP on HTML Canvas (which is North).
+            // So blowing TOWARD (windDir + 180 deg) points straight to the target compass tick.
+            let targetAngle = (stationData.windDir + 180) % 360;
             if (compassMode === 'gyro' && gyroActive) {
-                rotationAngle -= phoneHeading;
+                targetAngle -= phoneHeading;
             }
-            const windRad = (rotationAngle - 90) * (Math.PI / 180);
+
+            const windRad = targetAngle * (Math.PI / 180);
             const needleLen = radius - 28;
 
             compassCtx.save();
