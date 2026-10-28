@@ -669,7 +669,7 @@
             stationData.feelsLike = last.feelsLike ?? last.tempf ?? stationData.feelsLike;
             stationData.windDir = last.winddir ?? stationData.windDir;
             stationData.windSpeed = last.windspeedmph ?? stationData.windSpeed;
-            stationData.windGust = last.windgustmph ?? stationData.windGust;
+            stationData.windGust = last.maxdailygust ?? last.windgustmph ?? stationData.windGust;
             stationData.humidity = last.humidity ?? stationData.humidity;
             stationData.baro = last.baromrelin ?? stationData.baro;
             stationData.name = info.name || "Querner Family Farm Weather";
