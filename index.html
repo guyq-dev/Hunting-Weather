@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Ambient Weather - Hunting & Tactical Dashboard</title>
+    <title>Querner Farm - Hunting & Tactical Dashboard</title>
     
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -27,10 +27,6 @@
     
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-
-    <!-- Leaflet CSS & JS for Map -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -65,14 +61,9 @@
             opacity: 1;
         }
 
-        /* Compass canvas touch-action */
-        canvas#compassCanvas {
+        /* Canvas touch-action */
+        canvas {
             touch-action: none;
-        }
-
-        /* Leaflet custom map dark mode adjustment */
-        .leaflet-container {
-            background-color: #0b1120 !important;
         }
 
         /* Custom scrollbars */
@@ -87,14 +78,9 @@
             background: rgba(56, 189, 248, 0.3);
             border-radius: 4px;
         }
-
-        /* Pulsing map overlay pin */
-        .wind-marker-icon {
-            transition: transform 0.3s ease-out;
-        }
     </style>
 </head>
-<body class="h-full w-full overflow-hidden flex flex-col bg-slate-950 text-slate-100 antialiased selection:bg-sky-500 selection:text-white">
+<body class="h-full w-full overflow-hidden flex flex-col bg-slate-950 text-slate-100 antialiased selection:bg-sky-500 selection:text-white" onclick="initAudioAndSensors()">
 
     <!-- Header / Top Bar -->
     <header class="w-full h-14 bg-slate-900/80 border-b border-slate-800 flex items-center justify-between px-4 z-20 shrink-0">
@@ -103,7 +89,7 @@
                 <i data-lucide="wind" class="w-5 h-5"></i>
             </div>
             <div>
-                <h1 class="text-sm font-bold text-white tracking-wide uppercase leading-tight" id="station-title">Ambient Weather</h1>
+                <h1 class="text-sm font-bold text-white tracking-wide uppercase leading-tight" id="station-title">Querner Farm</h1>
                 <div class="flex items-center space-x-1.5">
                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" id="status-dot"></span>
                     <span class="text-[10px] font-medium text-slate-400" id="last-updated">Connecting...</span>
@@ -112,11 +98,6 @@
         </div>
 
         <div class="flex items-center space-x-2">
-            <!-- Sensor Permission/Status Indicator -->
-            <button id="gyro-perm-btn" onclick="requestGyroPermission()" class="text-[10px] bg-sky-500/20 border border-sky-500/40 text-sky-300 px-2 py-1 rounded-lg flex items-center space-x-1 hover:bg-sky-500/30">
-                <i data-lucide="compass" class="w-3 h-3"></i>
-                <span id="gyro-btn-text">Enable Compass</span>
-            </button>
             <!-- Manual Refresh Button -->
             <button id="refresh-btn" onclick="fetchStationData(true)" class="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 active:scale-95 transition text-slate-300 border border-slate-700/50">
                 <i data-lucide="refresh-cw" class="w-4 h-4" id="refresh-icon"></i>
@@ -141,37 +122,6 @@
         <!-- TAB 1: Live Gauge Dashboard -->
         <section id="tab-dashboard" class="tab-content active flex-1 flex-col overflow-y-auto p-4 space-y-4">
             
-            <!-- Main Temperature & Wind Banner Card -->
-            <div class="glass-panel rounded-2xl p-4 flex items-center justify-between relative overflow-hidden">
-                <div class="flex flex-col">
-                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Outdoor Temp</span>
-                    <div class="flex items-baseline space-x-1">
-                        <span id="val-temp" class="text-4xl font-extrabold text-white tracking-tight">--</span>
-                        <span class="text-lg font-medium text-sky-400 unit-temp">°F</span>
-                    </div>
-                    <div class="text-xs text-slate-400 mt-1 flex items-center space-x-2">
-                        <span>Feels like <strong id="val-feels" class="text-slate-200">--°</strong></span>
-                        <span>•</span>
-                        <span class="text-emerald-400">H: <span id="val-temp-max">--</span>°</span>
-                        <span class="text-sky-400">L: <span id="val-temp-min">--</span>°</span>
-                    </div>
-                </div>
-
-                <!-- Secondary Temp Quick Pill Stats -->
-                <div class="flex flex-col space-y-2 items-end">
-                    <div class="flex items-center space-x-2 bg-slate-900/60 px-3 py-1.5 rounded-xl border border-slate-700/40">
-                        <i data-lucide="droplets" class="w-3.5 h-3.5 text-sky-400"></i>
-                        <span class="text-xs font-medium text-slate-300">Humidity</span>
-                        <span id="val-humidity" class="text-xs font-bold text-white">--%</span>
-                    </div>
-                    <div class="flex items-center space-x-2 bg-slate-900/60 px-3 py-1.5 rounded-xl border border-slate-700/40">
-                        <i data-lucide="gauge" class="w-3.5 h-3.5 text-indigo-400"></i>
-                        <span class="text-xs font-medium text-slate-300">Baro</span>
-                        <span id="val-baro" class="text-xs font-bold text-white">-- inHg</span>
-                    </div>
-                </div>
-            </div>
-
             <!-- BALANCED COMPASS & WIND SECTION -->
             <div class="glass-panel rounded-3xl p-4 flex flex-col items-center justify-center relative overflow-hidden">
                 <div class="w-full flex items-center justify-between mb-2">
@@ -231,14 +181,45 @@
                 </div>
             </div>
 
+            <!-- Outdoor Temp Banner Card (Moved to Bottom) -->
+            <div class="glass-panel rounded-2xl p-4 flex items-center justify-between relative overflow-hidden">
+                <div class="flex flex-col">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Outdoor Temp</span>
+                    <div class="flex items-baseline space-x-1">
+                        <span id="val-temp" class="text-4xl font-extrabold text-white tracking-tight">--</span>
+                        <span class="text-lg font-medium text-sky-400 unit-temp">°F</span>
+                    </div>
+                    <div class="text-xs text-slate-400 mt-1 flex items-center space-x-2">
+                        <span>Feels like <strong id="val-feels" class="text-slate-200">--°</strong></span>
+                        <span>•</span>
+                        <span class="text-emerald-400">H: <span id="val-temp-max">--</span>°</span>
+                        <span class="text-sky-400">L: <span id="val-temp-min">--</span>°</span>
+                    </div>
+                </div>
+
+                <!-- Secondary Temp Quick Pill Stats -->
+                <div class="flex flex-col space-y-2 items-end">
+                    <div class="flex items-center space-x-2 bg-slate-900/60 px-3 py-1.5 rounded-xl border border-slate-700/40">
+                        <i data-lucide="droplets" class="w-3.5 h-3.5 text-sky-400"></i>
+                        <span class="text-xs font-medium text-slate-300">Humidity</span>
+                        <span id="val-humidity" class="text-xs font-bold text-white">--%</span>
+                    </div>
+                    <div class="flex items-center space-x-2 bg-slate-900/60 px-3 py-1.5 rounded-xl border border-slate-700/40">
+                        <i data-lucide="gauge" class="w-3.5 h-3.5 text-indigo-400"></i>
+                        <span class="text-xs font-medium text-slate-300">Baro</span>
+                        <span id="val-baro" class="text-xs font-bold text-white">-- inHg</span>
+                    </div>
+                </div>
+            </div>
+
         </section>
 
-        <!-- TAB 2: Map View -->
+        <!-- TAB 2: Tactical Radar Map View -->
         <section id="tab-map" class="tab-content flex-1 flex-col p-4 space-y-3 overflow-hidden">
             <div class="w-full flex items-center justify-between">
                 <div class="flex items-center space-x-2">
                     <i data-lucide="map" class="w-4 h-4 text-sky-400"></i>
-                    <h2 class="text-xs font-bold text-white uppercase tracking-wider">High-Res Satellite Map</h2>
+                    <h2 class="text-xs font-bold text-white uppercase tracking-wider">Tactical Wind Radar Overlay</h2>
                 </div>
                 <div class="flex items-center space-x-2">
                     <span id="map-wind-badge" class="text-[10px] font-semibold text-sky-300 bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 rounded-full flex items-center">
@@ -247,33 +228,14 @@
                 </div>
             </div>
 
-            <!-- Leaflet Map Canvas Container -->
-            <div class="flex-1 w-full rounded-2xl overflow-hidden border border-slate-800 relative">
-                <div id="map" class="w-full h-full z-0"></div>
+            <!-- API-Less Canvas Tactical Radar Container -->
+            <div class="flex-1 w-full rounded-2xl overflow-hidden border border-slate-800 relative bg-slate-950 flex items-center justify-center">
+                <canvas id="tacticalMapCanvas" class="w-full h-full"></canvas>
             </div>
         </section>
 
         <!-- TAB 3: Settings -->
         <section id="tab-settings" class="tab-content flex-1 flex-col overflow-y-auto p-4 space-y-4">
-            <!-- API Configuration Settings -->
-            <div class="glass-panel rounded-2xl p-4 space-y-3">
-                <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center space-x-2">
-                    <i data-lucide="key" class="w-4 h-4 text-sky-400"></i>
-                    <span>Ambient Weather API Credentials</span>
-                </h3>
-                <div class="space-y-2">
-                    <div>
-                        <label class="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Application Key</label>
-                        <input type="text" id="cfg-app-key" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-sky-500" value="3c0c6f9255e940cc85a33fdc61fd595f2d67ab447e2b4558adfd368dce325a3c">
-                    </div>
-                    <div>
-                        <label class="text-[10px] font-semibold text-slate-400 uppercase block mb-1">API Key</label>
-                        <input type="text" id="cfg-api-key" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-sky-500" value="0fcadb9f148641c5a5b0f07e0d913e084c0606f6fc304877aeee4e3723aa2604">
-                    </div>
-                    <button onclick="saveApiKeys()" class="w-full bg-sky-500 hover:bg-sky-600 active:scale-95 text-slate-950 font-bold py-2 rounded-xl text-xs transition">Save & Test Connection</button>
-                </div>
-            </div>
-
             <!-- Demo Mode & Simulation Settings -->
             <div class="glass-panel rounded-2xl p-4 space-y-3">
                 <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center space-x-2">
@@ -372,13 +334,14 @@
             tempUnit: localStorage.getItem('ambient_unit_temp') || 'f',
             speedUnit: localStorage.getItem('ambient_unit_speed') || 'mph',
             demoMode: localStorage.getItem('ambient_demo_mode') === 'true', 
-            appKey: localStorage.getItem('ambient_app_key') || '3c0c6f9255e940cc85a33fdc61fd595f2d67ab447e2b4558adfd368dce325a3c',
-            apiKey: localStorage.getItem('ambient_api_key') || '0fcadb9f148641c5a5b0f07e0d913e084c0606f6fc304877aeee4e3723aa2604'
+            appKey: '3c0c6f9255e940cc85a33fdc61fd595f2d67ab447e2b4558adfd368dce325a3c',
+            apiKey: '0fcadb9f148641c5a5b0f07e0d913e084c0606f6fc304877aeee4e3723aa2604'
         };
 
-        // Real-time Phone Gyro Heading Tracking
+        // Phone Gyro Heading Tracking
         let phoneHeading = 0;
         let gyroActive = false;
+        let sensorsInitialized = false;
 
         // Station Data Store
         let stationData = {
@@ -400,93 +363,61 @@
         };
 
         let rawApiResponse = null;
-        let mapInstance = null;
-        let mapMarker = null;
-
-        // Forecast data vectors
         let forecastWindDirs = [0, 0, 0, 0];
         let forecastWindSpeeds = [0, 0, 0, 0];
 
-        // Initialize App with Mobile Visibility Handling
+        // Initialize App & Auto-enable sensors on first interaction
         window.onload = function() {
             lucide.createIcons();
             loadSettingsToUI();
             initCompassCanvas();
-            initGyroSensors();
-            initMapView();
+            initTacticalMapCanvas();
 
             // Initial fetch
             fetchStationData(true);
 
-            // Auto-refresh interval (every 30 seconds)
-            setInterval(() => fetchStationData(false), 30000);
+            // Auto-refresh interval (every 10 seconds)
+            setInterval(() => fetchStationData(false), 10000);
 
-            // MOBILE FIX: Instantly refresh data when switching back to tab or unlocking phone
+            // Mobile visibility sync
             document.addEventListener("visibilitychange", () => {
                 if (!document.hidden) {
                     fetchStationData(false);
                 }
             });
 
-            // High frequency compass canvas redraw loop (60fps) for fluid gyro tracking
+            // 60fps render loop for compass & tactical radar map
             function renderLoop() {
                 drawCompass();
+                drawTacticalMap();
                 requestAnimationFrame(renderLoop);
             }
             requestAnimationFrame(renderLoop);
 
             window.addEventListener('resize', () => {
                 resizeCompassCanvas();
+                resizeTacticalMapCanvas();
             });
         };
 
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('nav button').forEach(el => {
-                el.classList.remove('text-sky-400');
-                el.classList.add('text-slate-400');
-            });
+        function initAudioAndSensors() {
+            if (sensorsInitialized) return;
+            sensorsInitialized = true;
 
-            document.getElementById(`tab-${tabId}`).classList.add('active');
-            const activeBtn = document.getElementById(`nav-btn-${tabId}`);
-            if (activeBtn) {
-                activeBtn.classList.remove('text-slate-400');
-                activeBtn.classList.add('text-sky-400');
-            }
-
-            if (tabId === 'map' && mapInstance) {
-                setTimeout(() => mapInstance.invalidateSize(), 200);
-            }
-        }
-
-        // Initialize Phone Compass / Orientation Sensors
-        function initGyroSensors() {
             if (window.DeviceOrientationEvent) {
                 if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                    document.getElementById('gyro-perm-btn').classList.remove('hidden');
+                    DeviceOrientationEvent.requestPermission()
+                        .then(response => {
+                            if (response === 'granted') {
+                                window.addEventListener('deviceorientation', handleOrientation, true);
+                                gyroActive = true;
+                            }
+                        })
+                        .catch(console.error);
                 } else {
                     window.addEventListener('deviceorientation', handleOrientation, true);
-                    document.getElementById('gyro-perm-btn').classList.add('hidden');
+                    gyroActive = true;
                 }
-            } else {
-                document.getElementById('gyro-perm-btn').classList.add('hidden');
-            }
-        }
-
-        function requestGyroPermission() {
-            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                DeviceOrientationEvent.requestPermission()
-                    .then(response => {
-                        if (response === 'granted') {
-                            window.addEventListener('deviceorientation', handleOrientation, true);
-                            document.getElementById('gyro-btn-text').innerText = "Compass Active";
-                            document.getElementById('gyro-perm-btn').classList.add('bg-emerald-500/20', 'text-emerald-300');
-                            gyroActive = true;
-                        } else {
-                            alert("Compass permission denied.");
-                        }
-                    })
-                    .catch(console.error);
             }
         }
 
@@ -501,11 +432,21 @@
             if (heading !== null && !isNaN(heading)) {
                 phoneHeading = heading;
                 gyroActive = true;
-                const btnText = document.getElementById('gyro-btn-text');
-                if (btnText && btnText.innerText !== "Compass Active") {
-                    btnText.innerText = "Compass Active";
-                    document.getElementById('gyro-perm-btn').classList.add('bg-emerald-500/20', 'text-emerald-300');
-                }
+            }
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('nav button').forEach(el => {
+                el.classList.remove('text-sky-400');
+                el.classList.add('text-slate-400');
+            });
+
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+            const activeBtn = document.getElementById(`nav-btn-${tabId}`);
+            if (activeBtn) {
+                activeBtn.classList.remove('text-slate-400');
+                activeBtn.classList.add('text-sky-400');
             }
         }
 
@@ -513,16 +454,6 @@
             document.getElementById('cfg-unit-temp').value = config.tempUnit;
             document.getElementById('cfg-unit-speed').value = config.speedUnit;
             document.getElementById('cfg-demo-toggle').checked = config.demoMode;
-            document.getElementById('cfg-app-key').value = config.appKey;
-            document.getElementById('cfg-api-key').value = config.apiKey;
-        }
-
-        function saveApiKeys() {
-            config.appKey = document.getElementById('cfg-app-key').value.trim();
-            config.apiKey = document.getElementById('cfg-api-key').value.trim();
-            localStorage.setItem('ambient_app_key', config.appKey);
-            localStorage.setItem('ambient_api_key', config.apiKey);
-            fetchStationData(true);
         }
 
         function toggleDemoMode(enabled) {
@@ -539,16 +470,14 @@
             updateUI();
         }
 
-        // Fetch Live Station Data from Ambient Weather API (with robust mobile fallback)
+        // Fetch Live Station Data from Ambient Weather API
         async function fetchStationData(manualTrigger = false) {
             const refreshIcon = document.getElementById('refresh-icon');
             if (refreshIcon) refreshIcon.classList.add('animate-spin');
 
-            document.getElementById('last-updated').innerText = "Syncing...";
-
             if (config.demoMode) {
                 simulateLiveSample();
-                if (refreshIcon) refreshIcon.classList.remove('animate-spin');
+                if (refreshIcon) setTimeout(() => refreshIcon.classList.remove('animate-spin'), 400);
                 return;
             }
 
@@ -567,12 +496,12 @@
                     throw new Error("No stations found in API response.");
                 }
             } catch (err) {
-                console.warn("API fetch failed or blocked. Falling back to simulation:", err);
+                console.warn("API fetch failed, falling back to simulation:", err);
                 simulateLiveSample();
                 document.getElementById('diagnostic-banner').classList.remove('hidden');
-                document.getElementById('diagnostic-text').innerText = "API blocked or offline. Running simulation fallback.";
+                document.getElementById('diagnostic-text').innerText = "API offline. Running simulation fallback.";
             } finally {
-                if (refreshIcon) refreshIcon.classList.remove('animate-spin');
+                if (refreshIcon) setTimeout(() => refreshIcon.classList.remove('animate-spin'), 400);
             }
         }
 
@@ -598,15 +527,6 @@
                 lastUpdated: last.date ? new Date(last.date) : new Date()
             };
 
-            if (info.coords && info.coords.lat && info.coords.lon) {
-                config.lat = info.coords.lat;
-                config.lng = info.coords.lon;
-                if (mapInstance) {
-                    mapInstance.setView([config.lat, config.lng], 14);
-                    if (mapMarker) mapMarker.setLatLng([config.lat, config.lng]);
-                }
-            }
-
             forecastWindDirs = [(stationData.windDir + 15) % 360, (stationData.windDir + 30) % 360, (stationData.windDir + 45) % 360, (stationData.windDir + 20) % 360];
             forecastWindSpeeds = [stationData.windSpeed + 0.5, stationData.windSpeed + 1.2, stationData.windSpeed + 0.8, stationData.windSpeed - 0.3];
 
@@ -621,8 +541,8 @@
                 tempMax: 62.0,
                 tempMin: 50.1,
                 windDir: 132,
-                windSpeed: 1.1,
-                windGust: 2.2,
+                windSpeed: 4.2,
+                windGust: 7.8,
                 humidity: 53,
                 baro: 30.077,
                 uv: 3,
@@ -633,7 +553,7 @@
                 lastUpdated: now
             };
             forecastWindDirs = [135, 140, 150, 130];
-            forecastWindSpeeds = [1.2, 1.8, 1.5, 1.0];
+            forecastWindSpeeds = [4.5, 6.2, 5.1, 4.0];
             updateUI();
         }
 
@@ -684,13 +604,6 @@
             document.getElementById('val-baro').innerText = `${stationData.baro.toFixed(3)} inHg`;
 
             document.getElementById('map-wind-text').innerText = `${Math.round(stationData.windDir)}° ${cardinal} (${speedVal.toFixed(1)} ${config.speedUnit})`;
-
-            if (mapMarker) {
-                const markerEl = document.querySelector('.wind-marker-icon');
-                if (markerEl) {
-                    markerEl.style.transform = `rotate(${stationData.windDir}deg)`;
-                }
-            }
 
             renderForecast();
             renderAllDataTab();
@@ -772,7 +685,7 @@
             return directions[index % 16];
         }
 
-        // Compass Canvas Rendering Engine
+        // Compass Canvas Engine
         let compassCanvas, compassCtx;
 
         function initCompassCanvas() {
@@ -802,7 +715,6 @@
 
             compassCtx.clearRect(0, 0, width, height);
 
-            // Outer ring background
             compassCtx.beginPath();
             compassCtx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
             compassCtx.fillStyle = 'rgba(15, 23, 42, 0.85)';
@@ -811,23 +723,29 @@
             compassCtx.strokeStyle = 'rgba(56, 189, 248, 0.2)';
             compassCtx.stroke();
 
-            // Degree ticks & cardinal directions
+            // Rotate compass dial if gyro is active
+            compassCtx.save();
+            compassCtx.translate(centerX, centerY);
+            if (gyroActive) {
+                compassCtx.rotate(-phoneHeading * (Math.PI / 180));
+            }
+
             for (let i = 0; i < 360; i += 30) {
                 const rad = (i - 90) * (Math.PI / 180);
                 const innerR = i % 90 === 0 ? radius - 12 : radius - 6;
                 const outerR = radius - 4;
 
                 compassCtx.beginPath();
-                compassCtx.moveTo(centerX + innerR * Math.cos(rad), centerY + innerR * Math.sin(rad));
-                compassCtx.lineTo(centerX + outerR * Math.cos(rad), centerY + outerR * Math.sin(rad));
+                compassCtx.moveTo(innerR * Math.cos(rad), innerR * Math.sin(rad));
+                compassCtx.lineTo(outerR * Math.cos(rad), outerR * Math.sin(rad));
                 compassCtx.strokeStyle = i % 90 === 0 ? '#38bdf8' : 'rgba(255, 255, 255, 0.3)';
                 compassCtx.lineWidth = i % 90 === 0 ? 2 : 1;
                 compassCtx.stroke();
 
                 if (i % 90 === 0) {
                     const labelR = radius - 24;
-                    const lx = centerX + labelR * Math.cos(rad);
-                    const ly = centerY + labelR * Math.sin(rad);
+                    const lx = labelR * Math.cos(rad);
+                    const ly = labelR * Math.sin(rad);
                     compassCtx.font = 'bold 11px Inter, sans-serif';
                     compassCtx.fillStyle = '#38bdf8';
                     compassCtx.textAlign = 'center';
@@ -836,14 +754,14 @@
                     compassCtx.fillText(labels[i], lx, ly);
                 }
             }
+            compassCtx.restore();
 
             // Wind Vector Arrow
-            const windRad = (stationData.windDir - 90) * (Math.PI / 180);
+            const windRad = (stationData.windDir - 90 - (gyroActive ? phoneHeading : 0)) * (Math.PI / 180);
             const arrowLen = radius - 35;
             const ax = centerX + arrowLen * Math.cos(windRad);
             const ay = centerY + arrowLen * Math.sin(windRad);
 
-            // Wind vector line
             compassCtx.beginPath();
             compassCtx.moveTo(centerX, centerY);
             compassCtx.lineTo(ax, ay);
@@ -851,7 +769,6 @@
             compassCtx.lineWidth = 3;
             compassCtx.stroke();
 
-            // Wind vector arrowhead
             compassCtx.save();
             compassCtx.translate(ax, ay);
             compassCtx.rotate(windRad + Math.PI / 2);
@@ -865,31 +782,113 @@
             compassCtx.restore();
         }
 
-        // Initialize Map
-        function initMapView() {
-            const mapContainer = document.getElementById('map');
-            if (!mapContainer) return;
+        // API-Less Tactical Wind Radar Map Canvas Engine
+        let tacticalCanvas, tacticalCtx;
 
-            mapInstance = L.map('map', {
-                attributionControl: false,
-                zoomControl: false
-            }).setView([config.lat, config.lng], 14);
+        function initTacticalMapCanvas() {
+            tacticalCanvas = document.getElementById('tacticalMapCanvas');
+            if (!tacticalCanvas) return;
+            tacticalCtx = tacticalCanvas.getContext('2d');
+            resizeTacticalMapCanvas();
+        }
 
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                maxZoom: 19
-            }).addTo(mapInstance);
+        function resizeTacticalMapCanvas() {
+            if (!tacticalCanvas) return;
+            const parent = tacticalCanvas.parentElement;
+            if (!parent) return;
+            tacticalCanvas.width = parent.clientWidth * window.devicePixelRatio;
+            tacticalCanvas.height = parent.clientHeight * window.devicePixelRatio;
+            tacticalCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        }
 
-            const customIcon = L.divIcon({
-                className: 'custom-wind-marker',
-                html: `<div class="w-8 h-8 rounded-full bg-sky-500/20 border-2 border-sky-400 flex items-center justify-center text-white shadow-lg wind-marker-icon" style="transform: rotate(${stationData.windDir}deg);">
-                    <svg class="w-4 h-4 text-sky-300" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
-                </div>`,
-                iconSize: [32, 32],
-                iconAnchor: [16, 16]
-            });
+        function drawTacticalMap() {
+            if (!tacticalCtx || !tacticalCanvas) return;
+            const width = tacticalCanvas.clientWidth;
+            const height = tacticalCanvas.clientHeight;
+            const centerX = width / 2;
+            const centerY = height / 2;
 
-            mapMarker = L.marker([config.lat, config.lng], { icon: customIcon }).addTo(mapInstance);
-            mapMarker.bindPopup("<b>Querner Family Farm</b><br>New Hampton, NY").openPopup();
+            tacticalCtx.clearRect(0, 0, width, height);
+
+            // Tactical Grid Background
+            tacticalCtx.fillStyle = '#090d16';
+            tacticalCtx.fillRect(0, 0, width, height);
+
+            // Radar Concentric Rings
+            const maxR = Math.min(centerX, centerY) - 40;
+            for (let r = 50; r <= maxR; r += 50) {
+                tacticalCtx.beginPath();
+                tacticalCtx.arc(centerX, centerY, r, 0, 2 * Math.PI);
+                tacticalCtx.strokeStyle = 'rgba(56, 189, 248, 0.1)';
+                tacticalCtx.lineWidth = 1;
+                tacticalCtx.stroke();
+            }
+
+            // Crosshairs
+            tacticalCtx.beginPath();
+            tacticalCtx.moveTo(centerX, 20); tacticalCtx.lineTo(centerX, height - 20);
+            tacticalCtx.moveTo(20, centerY); tacticalCtx.lineTo(width - 20, centerY);
+            tacticalCtx.strokeStyle = 'rgba(56, 189, 248, 0.15)';
+            tacticalCtx.lineWidth = 1;
+            tacticalCtx.stroke();
+
+            // Wind Stream Vector Rays
+            const windRad = (stationData.windDir - 90) * (Math.PI / 180);
+            const streamLen = maxR - 20;
+
+            tacticalCtx.save();
+            tacticalCtx.translate(centerX, centerY);
+            tacticalCtx.rotate(windRad);
+
+            // Glowing intensity plume
+            const gradient = tacticalCtx.createLinearGradient(0, 0, 0, -streamLen);
+            gradient.addColorStop(0, 'rgba(249, 115, 22, 0.4)');
+            gradient.addColorStop(1, 'rgba(56, 189, 248, 0.05)');
+
+            tacticalCtx.beginPath();
+            tacticalCtx.moveTo(0, 0);
+            tacticalCtx.lineTo(-25, -streamLen);
+            tacticalCtx.lineTo(25, -streamLen);
+            tacticalCtx.closePath();
+            tacticalCtx.fillStyle = gradient;
+            tacticalCtx.fill();
+
+            // Main wind vector arrow line
+            tacticalCtx.beginPath();
+            tacticalCtx.moveTo(0, 0);
+            tacticalCtx.lineTo(0, -streamLen);
+            tacticalCtx.strokeStyle = '#f97316';
+            tacticalCtx.lineWidth = 4;
+            tacticalCtx.stroke();
+
+            // Arrowhead
+            tacticalCtx.beginPath();
+            tacticalCtx.moveTo(0, -streamLen);
+            tacticalCtx.lineTo(-8, -streamLen + 15);
+            tacticalCtx.lineTo(8, -streamLen + 15);
+            tacticalCtx.closePath();
+            tacticalCtx.fillStyle = '#f97316';
+            tacticalCtx.fill();
+
+            tacticalCtx.restore();
+
+            // Center Farm Station Marker
+            tacticalCtx.beginPath();
+            tacticalCtx.arc(centerX, centerY, 8, 0, 2 * Math.PI);
+            tacticalCtx.fillStyle = '#38bdf8';
+            tacticalCtx.fill();
+            tacticalCtx.lineWidth = 3;
+            tacticalCtx.strokeStyle = '#ffffff';
+            tacticalCtx.stroke();
+
+            // Farm Label Badge
+            tacticalCtx.font = 'bold 11px Inter, sans-serif';
+            tacticalCtx.fillStyle = '#ffffff';
+            tacticalCtx.textAlign = 'center';
+            tacticalCtx.fillText("QUERNER FARM", centerX, centerY + 26);
+            tacticalCtx.font = '10px Inter, sans-serif';
+            tacticalCtx.fillStyle = '#38bdf8';
+            tacticalCtx.fillText(`${Math.round(stationData.windDir)}° • ${stationData.windSpeed} MPH`, centerX, centerY + 40);
         }
     </script>
 </body>
