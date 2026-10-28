@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Querner Farm - Hunting & Tactical Dashboard</title>
+    <title>Querner Family Farm Weather</title>
     
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -66,6 +66,16 @@
             touch-action: none;
         }
 
+        /* Update Flash Animation */
+        @keyframes updateFlash {
+            0% { transform: scale(1); background-color: rgba(52, 211, 153, 1); }
+            50% { transform: scale(1.4); background-color: rgba(56, 189, 248, 1); box-shadow: 0 0 12px #38bdf8; }
+            100% { transform: scale(1); background-color: rgba(52, 211, 153, 1); }
+        }
+        .flash-update {
+            animation: updateFlash 0.8s ease-in-out;
+        }
+
         /* Custom scrollbars */
         ::-webkit-scrollbar {
             width: 4px;
@@ -89,18 +99,18 @@
                 <i data-lucide="wind" class="w-5 h-5"></i>
             </div>
             <div>
-                <h1 class="text-sm font-bold text-white tracking-wide uppercase leading-tight" id="station-title">Querner Farm</h1>
+                <h1 class="text-sm font-bold text-white tracking-wide uppercase leading-tight" id="station-title">Querner Family Farm Weather</h1>
                 <div class="flex items-center space-x-1.5">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" id="status-dot"></span>
+                    <span class="w-2 h-2 rounded-full bg-emerald-400" id="status-dot"></span>
                     <span class="text-[10px] font-medium text-slate-400" id="last-updated">Connecting...</span>
                 </div>
             </div>
         </div>
 
         <div class="flex items-center space-x-2">
-            <!-- Manual Refresh Button -->
-            <button id="refresh-btn" onclick="fetchStationData(true)" class="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 active:scale-95 transition text-slate-300 border border-slate-700/50">
-                <i data-lucide="refresh-cw" class="w-4 h-4" id="refresh-icon"></i>
+            <!-- Manual Refresh Button (No spin circle) -->
+            <button id="refresh-btn" onclick="fetchStationData(true)" class="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 active:scale-95 transition text-slate-300 border border-slate-700/50" title="Refresh Data">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
             </button>
         </div>
     </header>
@@ -181,7 +191,7 @@
                 </div>
             </div>
 
-            <!-- Outdoor Temp Banner Card (Moved to Bottom) -->
+            <!-- Outdoor Temp Banner Card (At Bottom) -->
             <div class="glass-panel rounded-2xl p-4 flex items-center justify-between relative overflow-hidden">
                 <div class="flex flex-col">
                     <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Outdoor Temp</span>
@@ -228,9 +238,9 @@
                 </div>
             </div>
 
-            <!-- API-Less Canvas Tactical Radar Container -->
-            <div class="flex-1 w-full rounded-2xl overflow-hidden border border-slate-800 relative bg-slate-950 flex items-center justify-center">
-                <canvas id="tacticalMapCanvas" class="w-full h-full"></canvas>
+            <!-- API-Less Canvas Tactical Radar Container (Flex-1 with min-height) -->
+            <div class="flex-1 min-h-[300px] w-full rounded-2xl overflow-hidden border border-slate-800 relative bg-slate-950 flex items-center justify-center">
+                <canvas id="tacticalMapCanvas" class="w-full h-full block"></canvas>
             </div>
         </section>
 
@@ -358,11 +368,12 @@
             solar: 0,
             rain: 0,
             mac: "F4:CF:A2:79:FC:09",
-            name: "Querner Family Farm",
+            name: "Querner Family Farm Weather",
             lastUpdated: new Date()
         };
 
         let rawApiResponse = null;
+        let lastApiTimestamp = null;
         let forecastWindDirs = [0, 0, 0, 0];
         let forecastWindSpeeds = [0, 0, 0, 0];
 
@@ -373,16 +384,25 @@
             initCompassCanvas();
             initTacticalMapCanvas();
 
-            // Initial fetch
+            // Initial fetches
+            fetchHighLowFromZip10958();
             fetchStationData(true);
 
             // Auto-refresh interval (every 10 seconds)
-            setInterval(() => fetchStationData(false), 10000);
+            setInterval(() => {
+                fetchStationData(false);
+            }, 10000);
+
+            // Fetch zip code high/low once an hour as well
+            setInterval(() => {
+                fetchHighLowFromZip10958();
+            }, 3600000);
 
             // Mobile visibility sync
             document.addEventListener("visibilitychange", () => {
                 if (!document.hidden) {
                     fetchStationData(false);
+                    fetchHighLowFromZip10958();
                 }
             });
 
@@ -448,6 +468,10 @@
                 activeBtn.classList.remove('text-slate-400');
                 activeBtn.classList.add('text-sky-400');
             }
+
+            if (tabId === 'map') {
+                setTimeout(() => resizeTacticalMapCanvas(), 50);
+            }
         }
 
         function loadSettingsToUI() {
@@ -470,14 +494,36 @@
             updateUI();
         }
 
+        // Fetch Daily High/Low from Zip Code 10958 (Open-Meteo Free API)
+        async function fetchHighLowFromZip10958() {
+            try {
+                // Coordinates for 10958 (New Hampton, NY)
+                const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=41.3764&longitude=-74.4288&daily=temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&timezone=America%2FNew_York');
+                const data = await res.json();
+                if (data && data.daily) {
+                    stationData.tempMax = data.daily.temperature_2m_max[0] ?? stationData.tempMax;
+                    stationData.tempMin = data.daily.temperature_2m_min[0] ?? stationData.tempMin;
+                    updateUI();
+                }
+            } catch (e) {
+                console.warn("Could not fetch ZIP 10958 high/low temperatures:", e);
+            }
+        }
+
+        // Trigger visual flash pulse when station timestamp updates
+        function triggerUpdateFlash() {
+            const dot = document.getElementById('status-dot');
+            if (dot) {
+                dot.classList.remove('flash-update');
+                void dot.offsetWidth; // trigger reflow
+                dot.classList.add('flash-update');
+            }
+        }
+
         // Fetch Live Station Data from Ambient Weather API
         async function fetchStationData(manualTrigger = false) {
-            const refreshIcon = document.getElementById('refresh-icon');
-            if (refreshIcon) refreshIcon.classList.add('animate-spin');
-
             if (config.demoMode) {
                 simulateLiveSample();
-                if (refreshIcon) setTimeout(() => refreshIcon.classList.remove('animate-spin'), 400);
                 return;
             }
 
@@ -490,6 +536,15 @@
                 if (data && data.length > 0) {
                     const station = data.find(s => s.macAddress === "F4:CF:A2:79:FC:09") || data[0];
                     rawApiResponse = station;
+                    
+                    const currentApiDate = station.lastData?.date;
+                    if (lastApiTimestamp && currentApiDate && currentApiDate !== lastApiTimestamp) {
+                        triggerUpdateFlash();
+                    }
+                    if (currentApiDate) {
+                        lastApiTimestamp = currentApiDate;
+                    }
+
                     parseApiStationData(station);
                     document.getElementById('diagnostic-banner').classList.add('hidden');
                 } else {
@@ -497,11 +552,11 @@
                 }
             } catch (err) {
                 console.warn("API fetch failed, falling back to simulation:", err);
-                simulateLiveSample();
-                document.getElementById('diagnostic-banner').classList.remove('hidden');
-                document.getElementById('diagnostic-text').innerText = "API offline. Running simulation fallback.";
-            } finally {
-                if (refreshIcon) setTimeout(() => refreshIcon.classList.remove('animate-spin'), 400);
+                if (manualTrigger) {
+                    simulateLiveSample();
+                    document.getElementById('diagnostic-banner').classList.remove('hidden');
+                    document.getElementById('diagnostic-text').innerText = "API offline. Running simulation fallback.";
+                }
             }
         }
 
@@ -509,23 +564,19 @@
             const last = station.lastData || {};
             const info = station.info || {};
 
-            stationData = {
-                temp: last.tempf ?? 68.0,
-                feelsLike: last.feelsLike ?? last.tempf ?? 68.0,
-                tempMax: last.tempmaxf ?? last.tempf ?? 75.0,
-                tempMin: last.tempminf ?? last.tempf ?? 60.0,
-                windDir: last.winddir ?? 0,
-                windSpeed: last.windspeedmph ?? 0,
-                windGust: last.windgustmph ?? 0,
-                humidity: last.humidity ?? 50,
-                baro: last.baromrelin ?? 29.92,
-                uv: last.uv ?? 0,
-                solar: last.solarradiation ?? 0,
-                rain: last.dailyrainin ?? 0,
-                mac: station.macAddress || "F4:CF:A2:79:FC:09",
-                name: info.name || "Querner Family Farm",
-                lastUpdated: last.date ? new Date(last.date) : new Date()
-            };
+            stationData.temp = last.tempf ?? stationData.temp;
+            stationData.feelsLike = last.feelsLike ?? last.tempf ?? stationData.feelsLike;
+            stationData.windDir = last.winddir ?? stationData.windDir;
+            stationData.windSpeed = last.windspeedmph ?? stationData.windSpeed;
+            stationData.windGust = last.windgustmph ?? stationData.windGust;
+            stationData.humidity = last.humidity ?? stationData.humidity;
+            stationData.baro = last.baromrelin ?? stationData.baro;
+            stationData.uv = last.uv ?? stationData.uv;
+            stationData.solar = last.solarradiation ?? stationData.solar;
+            stationData.rain = last.dailyrainin ?? stationData.rain;
+            stationData.mac = station.macAddress || "F4:CF:A2:79:FC:09";
+            stationData.name = info.name || "Querner Family Farm Weather";
+            stationData.lastUpdated = last.date ? new Date(last.date) : new Date();
 
             forecastWindDirs = [(stationData.windDir + 15) % 360, (stationData.windDir + 30) % 360, (stationData.windDir + 45) % 360, (stationData.windDir + 20) % 360];
             forecastWindSpeeds = [stationData.windSpeed + 0.5, stationData.windSpeed + 1.2, stationData.windSpeed + 0.8, stationData.windSpeed - 0.3];
@@ -538,8 +589,8 @@
             stationData = {
                 temp: 55.9,
                 feelsLike: 55.9,
-                tempMax: 62.0,
-                tempMin: 50.1,
+                tempMax: stationData.tempMax || 62.0,
+                tempMin: stationData.tempMin || 50.1,
                 windDir: 132,
                 windSpeed: 4.2,
                 windGust: 7.8,
@@ -549,9 +600,10 @@
                 solar: 368.23,
                 rain: 0,
                 mac: "F4:CF:A2:79:FC:09",
-                name: "Querner Family Farm",
+                name: "Querner Family Farm Weather",
                 lastUpdated: now
             };
+            triggerUpdateFlash();
             forecastWindDirs = [135, 140, 150, 130];
             forecastWindSpeeds = [4.5, 6.2, 5.1, 4.0];
             updateUI();
@@ -723,7 +775,6 @@
             compassCtx.strokeStyle = 'rgba(56, 189, 248, 0.2)';
             compassCtx.stroke();
 
-            // Rotate compass dial if gyro is active
             compassCtx.save();
             compassCtx.translate(centerX, centerY);
             if (gyroActive) {
@@ -796,8 +847,10 @@
             if (!tacticalCanvas) return;
             const parent = tacticalCanvas.parentElement;
             if (!parent) return;
-            tacticalCanvas.width = parent.clientWidth * window.devicePixelRatio;
-            tacticalCanvas.height = parent.clientHeight * window.devicePixelRatio;
+            const width = parent.clientWidth || 300;
+            const height = parent.clientHeight || 300;
+            tacticalCanvas.width = width * window.devicePixelRatio;
+            tacticalCanvas.height = height * window.devicePixelRatio;
             tacticalCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
         }
 
@@ -885,7 +938,7 @@
             tacticalCtx.font = 'bold 11px Inter, sans-serif';
             tacticalCtx.fillStyle = '#ffffff';
             tacticalCtx.textAlign = 'center';
-            tacticalCtx.fillText("QUERNER FARM", centerX, centerY + 26);
+            tacticalCtx.fillText("QUERNER FAMILY FARM", centerX, centerY + 26);
             tacticalCtx.font = '10px Inter, sans-serif';
             tacticalCtx.fillStyle = '#38bdf8';
             tacticalCtx.fillText(`${Math.round(stationData.windDir)}° • ${stationData.windSpeed} MPH`, centerX, centerY + 40);
