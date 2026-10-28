@@ -28,6 +28,10 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
+    <!-- Leaflet CSS & JS for Satellite Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
         body {
@@ -84,6 +88,11 @@
         ::-webkit-scrollbar-thumb {
             background: rgba(56, 189, 248, 0.3);
             border-radius: 4px;
+        }
+
+        /* Leaflet custom dark theme tweaks */
+        .leaflet-container {
+            background: #090d16 !important;
         }
     </style>
 </head>
@@ -210,37 +219,22 @@
 
         </section>
 
-        <!-- TAB 2: Tactical Radar Map View + Satellite Image -->
-        <section id="tab-map" class="tab-content flex-1 flex-col p-4 space-y-3 overflow-y-auto">
+        <!-- TAB 2: Overhead Farm Satellite Map & Wind Overlay -->
+        <section id="tab-map" class="tab-content flex-1 flex-col p-4 space-y-3 overflow-hidden">
             <div class="w-full flex items-center justify-between shrink-0">
                 <div class="flex items-center space-x-2">
                     <i data-lucide="map" class="w-4 h-4 text-sky-400"></i>
-                    <h2 class="text-xs font-bold text-white uppercase tracking-wider">Tactical Wind Radar & Satellite</h2>
+                    <h2 class="text-xs font-bold text-white uppercase tracking-wider">Overhead Farm Map & Wind Vector</h2>
                 </div>
                 <div class="flex items-center space-x-2">
-                    <span id="map-wind-badge" class="text-[10px] font-semibold text-sky-300 bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 rounded-full flex items-center">
+                    <span id="map-wind-badge" class="text-[10px] font-semibold text-sky-300 bg-sky-500/10 border border-sky-500/20 px-2.5 py-0.5 rounded-full flex items-center">
                         <i data-lucide="navigation" class="w-3 h-3 mr-1 text-sky-400 inline"></i> <span id="map-wind-text">--° Wind Vector</span>
                     </span>
                 </div>
             </div>
 
-            <!-- Tactical Canvas Radar Overlay -->
-            <div class="w-full h-64 rounded-2xl overflow-hidden border border-slate-800 relative bg-slate-950 flex items-center justify-center shrink-0" id="tactical-wrapper">
-                <canvas id="tacticalMapCanvas" class="w-full h-full block"></canvas>
-            </div>
-
-            <!-- Satellite Map Card -->
-            <div class="glass-panel rounded-2xl p-3 flex flex-col space-y-2 shrink-0">
-                <div class="flex items-center justify-between">
-                    <span class="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center">
-                        <i data-lucide="globe" class="w-3.5 h-3.5 mr-1.5 text-sky-400"></i> Farm Aerial Satellite Map
-                    </span>
-                    <span class="text-[10px] text-slate-400">New Hampton, NY</span>
-                </div>
-                <div class="w-full h-44 rounded-xl overflow-hidden border border-slate-800 relative">
-                    <img src="https://cdn.landsearch.com/listings/4WyHp/small/middletown-ny-179461668.jpg" alt="Farm Satellite Aerial View" class="w-full h-full object-cover">
-                </div>
-            </div>
+            <!-- Leaflet Interactive Satellite Map Container -->
+            <div class="flex-1 w-full rounded-2xl overflow-hidden border border-slate-800 relative z-10" id="satelliteMap"></div>
         </section>
 
         <!-- TAB 3: Settings -->
@@ -332,6 +326,8 @@
     <!-- App Logic -->
     <script>
         let config = {
+            farmLat: 41.3872,
+            farmLng: -74.4195,
             tempUnit: localStorage.getItem('ambient_unit_temp') || 'f',
             speedUnit: localStorage.getItem('ambient_unit_speed') || 'mph',
             demoMode: localStorage.getItem('ambient_demo_mode') === 'true', 
@@ -363,11 +359,16 @@
         let forecastWindDirs = [0, 0, 0, 0];
         let forecastWindSpeeds = [0, 0, 0, 0];
 
+        // Leaflet Map Handles
+        let mapInstance = null;
+        let farmMarker = null;
+        let windVectorOverlay = null;
+
         window.onload = function() {
             lucide.createIcons();
             loadSettingsToUI();
             initCompassCanvas();
-            initTacticalMapCanvas();
+            initSatelliteMap();
 
             fetchHighLowFromZip10958();
             fetchStationData(true);
@@ -386,7 +387,6 @@
 
             function renderLoop() {
                 drawCompass();
-                drawTacticalMap();
                 requestAnimationFrame(renderLoop);
             }
             requestAnimationFrame(renderLoop);
@@ -394,14 +394,65 @@
 
         function setupResizeObservers() {
             const compassWrap = document.getElementById('compass-wrapper');
-            const tacticalWrap = document.getElementById('tactical-wrapper');
-
             if (compassWrap && window.ResizeObserver) {
                 new ResizeObserver(() => resizeCompassCanvas()).observe(compassWrap);
             }
-            if (tacticalWrap && window.ResizeObserver) {
-                new ResizeObserver(() => resizeTacticalMapCanvas()).observe(tacticalWrap);
+        }
+
+        function initSatelliteMap() {
+            if (mapInstance) return;
+
+            // Initialize Leaflet satellite map centered on farm coordinates
+            mapInstance = L.map('satelliteMap', {
+                zoomControl: false,
+                attributionControl: false
+            }).setView([config.farmLat, config.farmLng], 16);
+
+            // Esri High-Resolution World Imagery Tile Layer
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 19
+            }).addTo(mapInstance);
+
+            // Center Marker for Farm
+            const farmIcon = L.divIcon({
+                className: 'custom-farm-marker',
+                html: `<div class="w-6 h-6 rounded-full bg-sky-500 border-2 border-white shadow-lg flex items-center justify-center text-white"><i data-lucide="home" class="w-3.5 h-3.5"></i></div>`,
+                iconSize: [24, 24],
+                iconAnchor: [12, 12]
+            });
+            farmMarker = L.marker([config.farmLat, config.farmLng], { icon: farmIcon }).addTo(mapInstance);
+
+            updateSatelliteWindOverlay();
+        }
+
+        function updateSatelliteWindOverlay() {
+            if (!mapInstance) return;
+
+            if (windVectorOverlay) {
+                mapInstance.removeLayer(windVectorOverlay);
             }
+
+            const cardinal = getCardinalDirection(stationData.windDir);
+            
+            // Create rotated wind vector arrow layer over map center
+            const windArrowIcon = L.divIcon({
+                className: 'custom-wind-overlay',
+                html: `
+                    <div class="flex flex-col items-center justify-center pointer-events-none">
+                        <div class="w-12 h-12 rounded-full bg-orange-500/20 border border-orange-500/50 flex items-center justify-center text-orange-400 transform transition-transform duration-500 shadow-xl" style="transform: rotate(${stationData.windDir}deg);">
+                            <i data-lucide="arrow-up" class="w-7 h-7 stroke-[3]"></i>
+                        </div>
+                        <div class="mt-1 px-2 py-0.5 rounded-md bg-slate-900/90 border border-slate-700 text-[10px] font-extrabold text-white shadow-md">
+                            ${Math.round(stationData.windDir)}° ${cardinal} • ${stationData.windSpeed} MPH
+                        </div>
+                    </div>
+                `,
+                iconSize: [120, 80],
+                iconAnchor: [60, 40]
+            });
+
+            windVectorOverlay = L.marker([config.farmLat, config.farmLng], { icon: windArrowIcon }).addTo(mapInstance);
+            lucide.createIcons();
         }
 
         function initSensorsOnce() {
@@ -453,8 +504,11 @@
                 activeBtn.classList.add('text-sky-400');
             }
 
-            if (tabId === 'map') {
-                setTimeout(() => resizeTacticalMapCanvas(), 50);
+            if (tabId === 'map' && mapInstance) {
+                setTimeout(() => {
+                    mapInstance.invalidateSize();
+                    mapInstance.setView([config.farmLat, config.farmLng], 16);
+                }, 100);
             }
         }
 
@@ -492,12 +546,11 @@
             }
         }
 
-        // Trigger exact 1-second green blink on the status dot in top right
         function triggerUpdateFlash() {
             const dot = document.getElementById('status-dot-top');
             if (dot) {
                 dot.classList.remove('blink-update');
-                void dot.offsetWidth; // force reflow
+                void dot.offsetWidth;
                 dot.classList.add('blink-update');
             }
         }
@@ -630,6 +683,7 @@
 
             renderForecast();
             renderAllDataTab();
+            updateSatelliteWindOverlay();
         }
 
         function renderForecast() {
@@ -771,139 +825,23 @@
             }
             compassCtx.restore();
 
-            // Traditional Compass Needle Style
+            // Single Orange Direction Vector Needle (No pin dot, no gray tail)
             const windRad = (stationData.windDir - 90 - (gyroActive ? phoneHeading : 0)) * (Math.PI / 180);
-            const needleLen = radius - 30;
+            const needleLen = radius - 28;
 
             compassCtx.save();
             compassCtx.translate(centerX, centerY);
             compassCtx.rotate(windRad);
 
-            // North Arrow Head (Orange)
             compassCtx.beginPath();
             compassCtx.moveTo(0, -needleLen);
-            compassCtx.lineTo(-7, 0);
-            compassCtx.lineTo(7, 0);
+            compassCtx.lineTo(-8, 0);
+            compassCtx.lineTo(8, 0);
             compassCtx.closePath();
             compassCtx.fillStyle = '#f97316';
             compassCtx.fill();
 
-            // South Tail (Slate)
-            compassCtx.beginPath();
-            compassCtx.moveTo(0, needleLen * 0.7);
-            compassCtx.lineTo(-6, 0);
-            compassCtx.lineTo(6, 0);
-            compassCtx.closePath();
-            compassCtx.fillStyle = '#64748b';
-            compassCtx.fill();
-
-            // Center Pin
-            compassCtx.beginPath();
-            compassCtx.arc(0, 0, 4, 0, 2 * Math.PI);
-            compassCtx.fillStyle = '#ffffff';
-            compassCtx.fill();
-
             compassCtx.restore();
-        }
-
-        let tacticalCanvas, tacticalCtx;
-
-        function initTacticalMapCanvas() {
-            tacticalCanvas = document.getElementById('tacticalMapCanvas');
-            if (!tacticalCanvas) return;
-            tacticalCtx = tacticalCanvas.getContext('2d');
-            resizeTacticalMapCanvas();
-        }
-
-        function resizeTacticalMapCanvas() {
-            if (!tacticalCanvas) return;
-            const parent = tacticalCanvas.parentElement;
-            if (!parent) return;
-            const width = Math.max(parent.clientWidth, 200);
-            const height = Math.max(parent.clientHeight, 200);
-            tacticalCanvas.width = width * window.devicePixelRatio;
-            tacticalCanvas.height = height * window.devicePixelRatio;
-            tacticalCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
-        }
-
-        function drawTacticalMap() {
-            if (!tacticalCtx || !tacticalCanvas) return;
-            const width = tacticalCanvas.clientWidth;
-            const height = tacticalCanvas.clientHeight;
-            if (!width || !height) return;
-
-            const centerX = width / 2;
-            const centerY = height / 2;
-
-            tacticalCtx.clearRect(0, 0, width, height);
-
-            tacticalCtx.fillStyle = '#090d16';
-            tacticalCtx.fillRect(0, 0, width, height);
-
-            const maxR = Math.max(Math.min(centerX, centerY) - 30, 40);
-            for (let r = 40; r <= maxR; r += 40) {
-                tacticalCtx.beginPath();
-                tacticalCtx.arc(centerX, centerY, r, 0, 2 * Math.PI);
-                tacticalCtx.strokeStyle = 'rgba(56, 189, 248, 0.1)';
-                tacticalCtx.lineWidth = 1;
-                tacticalCtx.stroke();
-            }
-
-            tacticalCtx.beginPath();
-            tacticalCtx.moveTo(centerX, 15); tacticalCtx.lineTo(centerX, height - 15);
-            tacticalCtx.moveTo(15, centerY); tacticalCtx.lineTo(width - 15, centerY);
-            tacticalCtx.strokeStyle = 'rgba(56, 189, 248, 0.15)';
-            tacticalCtx.lineWidth = 1;
-            tacticalCtx.stroke();
-
-            const windRad = (stationData.windDir - 90) * (Math.PI / 180);
-            const streamLen = Math.max(maxR - 20, 20);
-
-            tacticalCtx.save();
-            tacticalCtx.translate(centerX, centerY);
-            tacticalCtx.rotate(windRad);
-
-            const gradient = tacticalCtx.createLinearGradient(0, 0, 0, -streamLen);
-            gradient.addColorStop(0, 'rgba(249, 115, 22, 0.4)');
-            gradient.addColorStop(1, 'rgba(56, 189, 248, 0.05)');
-
-            tacticalCtx.beginPath();
-            tacticalCtx.moveTo(0, 0);
-            tacticalCtx.lineTo(-20, -streamLen);
-            tacticalCtx.lineTo(20, -streamLen);
-            tacticalCtx.closePath();
-            tacticalCtx.fillStyle = gradient;
-            tacticalCtx.fill();
-
-            tacticalCtx.beginPath();
-            tacticalCtx.moveTo(0, 0);
-            tacticalCtx.lineTo(0, -streamLen);
-            tacticalCtx.strokeStyle = '#f97316';
-            tacticalCtx.lineWidth = 4;
-            tacticalCtx.stroke();
-
-            tacticalCtx.beginPath();
-            tacticalCtx.moveTo(0, -streamLen);
-            tacticalCtx.lineTo(-7, -streamLen + 12);
-            tacticalCtx.lineTo(7, -streamLen + 12);
-            tacticalCtx.closePath();
-            tacticalCtx.fillStyle = '#f97316';
-            tacticalCtx.fill();
-
-            tacticalCtx.restore();
-
-            tacticalCtx.beginPath();
-            tacticalCtx.arc(centerX, centerY, 7, 0, 2 * Math.PI);
-            tacticalCtx.fillStyle = '#38bdf8';
-            tacticalCtx.fill();
-            tacticalCtx.lineWidth = 2;
-            tacticalCtx.strokeStyle = '#ffffff';
-            tacticalCtx.stroke();
-
-            tacticalCtx.font = 'bold 10px Inter, sans-serif';
-            tacticalCtx.fillStyle = '#ffffff';
-            tacticalCtx.textAlign = 'center';
-            tacticalCtx.fillText("FARM CENTER", centerX, centerY + 22);
         }
     </script>
 </body>
