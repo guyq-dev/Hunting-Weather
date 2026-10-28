@@ -112,8 +112,9 @@
             </div>
         </div>
 
-        <!-- Upper Right Status Dot (Normally black, blinks green for 1s on update) -->
+        <!-- Upper Right Status Dot and Seconds Elapsed Counter -->
         <div class="flex items-center space-x-2">
+            <span id="seconds-elapsed" class="text-[11px] font-mono font-bold text-slate-400">0s</span>
             <div id="status-dot-top" class="w-3.5 h-3.5 rounded-full bg-black border border-slate-700 transition-colors" title="Data Sync Status"></div>
         </div>
     </header>
@@ -356,6 +357,7 @@
 
         let rawApiResponse = null;
         let lastApiTimestamp = null;
+        let secondsSinceRefresh = 0;
         let forecastWindDirs = [0, 0, 0, 0];
         let forecastWindSpeeds = [0, 0, 0, 0];
 
@@ -372,6 +374,15 @@
 
             fetchHighLowFromZip10958();
             fetchStationData(true);
+
+            // Ticking seconds counter
+            setInterval(() => {
+                secondsSinceRefresh++;
+                const counterEl = document.getElementById('seconds-elapsed');
+                if (counterEl) {
+                    counterEl.innerText = `${secondsSinceRefresh}s`;
+                }
+            }, 1000);
 
             setInterval(() => fetchStationData(false), 10000);
             setInterval(() => fetchHighLowFromZip10958(), 3600000);
@@ -402,18 +413,15 @@
         function initSatelliteMap() {
             if (mapInstance) return;
 
-            // Initialize Leaflet satellite map centered on farm coordinates
             mapInstance = L.map('satelliteMap', {
                 zoomControl: false,
                 attributionControl: false
             }).setView([config.farmLat, config.farmLng], 16);
 
-            // Esri High-Resolution World Imagery Tile Layer
             L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                 maxZoom: 19
             }).addTo(mapInstance);
 
-            // Center Marker for Farm
             const farmIcon = L.divIcon({
                 className: 'custom-farm-marker',
                 html: `<div class="w-6 h-6 rounded-full bg-sky-500 border-2 border-white shadow-lg flex items-center justify-center text-white"><i data-lucide="home" class="w-3.5 h-3.5"></i></div>`,
@@ -434,7 +442,6 @@
 
             const cardinal = getCardinalDirection(stationData.windDir);
             
-            // Create rotated wind vector arrow layer over map center
             const windArrowIcon = L.divIcon({
                 className: 'custom-wind-overlay',
                 html: `
@@ -547,6 +554,13 @@
         }
 
         function triggerUpdateFlash() {
+            // Reset seconds counter to zero upon refresh
+            secondsSinceRefresh = 0;
+            const counterEl = document.getElementById('seconds-elapsed');
+            if (counterEl) {
+                counterEl.innerText = "0s";
+            }
+
             const dot = document.getElementById('status-dot-top');
             if (dot) {
                 dot.classList.remove('blink-update');
@@ -574,7 +588,10 @@
                     const currentApiDate = station.lastData?.date;
                     if (lastApiTimestamp && currentApiDate && currentApiDate !== lastApiTimestamp) {
                         triggerUpdateFlash();
+                    } else if (manualTrigger) {
+                        triggerUpdateFlash();
                     }
+
                     if (currentApiDate) {
                         lastApiTimestamp = currentApiDate;
                     }
@@ -825,7 +842,7 @@
             }
             compassCtx.restore();
 
-            // Single Orange Direction Vector Needle (No pin dot, no gray tail)
+            // Single Orange Direction Vector Needle
             const windRad = (stationData.windDir - 90 - (gyroActive ? phoneHeading : 0)) * (Math.PI / 180);
             const needleLen = radius - 28;
 
